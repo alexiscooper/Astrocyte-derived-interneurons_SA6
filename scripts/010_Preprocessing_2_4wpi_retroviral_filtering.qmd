@@ -1,4 +1,50 @@
-
+---
+title: 'BC021: Deconstructing in vivo glia-to-neuron conversion in the postnatal mouse cortex.'
+subtitle: '2: Retroviral transcript annotation of samples and sampling'
+date: last-modified
+author: 
+    - name : Karla Lozano Gonzalez
+      email : karla.lozano_gonzalez@kcl.ac.uk
+      orcid : 0000-0003-0329-4668
+      affiliation: CDN Bioinformatics Core
+      affiliation-url: https://emckclac.sharepoint.com/sites/IoPPNcdnb/SitePages/Bioinformatics.aspx
+    - name : Fursham Hamid
+      email : fursham.hamid@kcl.ac.uk
+      url : https://twitter.com/FurshamH
+      orcid : 0000-0002-6846-7382
+      affiliation: CDN Bioinformatics Core
+      affiliation-url: https://devneuro.org/cdn/index.php
+    
+format:
+    html:
+        page-layout: full
+        theme: pulse
+        highlight: espresso
+        css: /home/cdn-bc/Github_repo/fuRsh/inst/resources/styles.css
+        smooth-scroll: true
+        self-contained: true
+        toc-depth: 3
+        toc: true
+        toc-location: right
+        toc-title: Contents
+        code-fold: false
+        df-print: paged
+        grid:
+            sidebar-width: 150px
+            body-width: 950px
+            margin-width: 150px
+            gutter-width: 1em
+fig-cap-location: margin
+tbl-cap-location: margin
+fig-align: center
+title-block-banner: /home/cdn-bc/Github_repo/fuRsh/man/figures/banner.jpg
+title-blocks-style: plain
+filters:
+   - /home/cdn-bc/Github_repo/fuRsh/inst/resources/include-code-files.lua
+editor: 
+  markdown: 
+    wrap: 72
+---
 
 ```{r}
 #| label: reportsetup
