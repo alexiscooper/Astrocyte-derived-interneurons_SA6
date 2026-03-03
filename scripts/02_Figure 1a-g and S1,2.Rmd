@@ -1,0 +1,294 @@
+---
+title: "Figure 1"
+output: html_document
+date: "2025-10-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(Seurat)
+library(SeuratDisk)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(tidyverse)
+library(RColorBrewer)
+library(dittoSeq)
+library(Nebulosa)
+library(dplyr)
+library(magrittr)
+library(patchwork)
+library(scCustomize)
+library(qs)
+library(viridis)
+ library(dittoSeq)
+library(ggtext)
+```
+
+#### main Figure 1
+```{r install.data, eval=FALSE, include=FALSE}
+mergeAll_filtered <- readRDS("/seurat_4dpi_merged_LogNorm_newID_3000_removedlowcounts.rds")
+```
+
+### just include 5 samples
+```{r}
+# Step 1: Subset the dataset
+mergeAll_5 <- subset(mergeAll_filtered, subset = RV %in% c("Control", "Ascl1WT", "Ascl1WTBcl2","Ascl1SA6","Ascl1SA6Bcl2"))
+mergeAll_5$RV <- factor(mergeAll_5$RV, levels = c("Control", "Ascl1WT", "Ascl1WTBcl2","Ascl1SA6","Ascl1SA6Bcl2")) 
+
+# Set Default Assay to RNA
+mergeAll_5 <- mergeAll_5 %>%
+  DietSeurat(., assays = "RNA", layers = c("counts"))
+mergeAll_5 <- NormalizeData(mergeAll_5, assay = "RNA")
+mergeAll_5 <- FindVariableFeatures(mergeAll_5)
+mergeAll_5 <- ScaleData(mergeAll_5, features = rownames(mergeAll_5))
+mergeAll_5 <- RunPCA(mergeAll_5, features = VariableFeatures(mergeAll_5), verbose = TRUE)
+mergeAll_5 <- FindNeighbors(object = mergeAll_5, dims = 1:25) 
+mergeAll_5 <- FindClusters(object = mergeAll_5, resolution = 3)
+mergeAll_5 <- RunUMAP(object = mergeAll_5, dims = 1:21) 
+DimPlot(mergeAll_5, group.by = 'seurat_clusters', pt.size = 0.5, label = TRUE)
+DimPlot(mergeAll_5, group.by = 'RV', pt.size = 0.5) + Blank_Theme()
+DimPlot(mergeAll_5, group.by = 'Phase', pt.size = 0.5) + Blank_Theme() 
+```
+
+##downsample and plot cells for each RV condition Fig. 1c
+```{r}
+library(patchwork)
+Idents(mergeAll_5) <- "RV"
+print(table(mergeAll_5$RV))
+mergeAll_5_down <- subset(mergeAll_5, downsample=1000)
+print(table(mergeAll_5_down$RV))
+p1 <- DimPlot(subset(mergeAll_5_down),  cells.highlight = colnames(mergeAll_5[,mergeAll_5$RV=="Control"]),   cols.highlight = "black", pt.size = 0.1) + Blank_Theme() + NoLegend()+ Blank_Theme()  
+p2 <- DimPlot(subset(mergeAll_5_down),  cells.highlight = colnames(mergeAll_5[,mergeAll_5$RV=="Ascl1WT"]),   cols.highlight = "#1E90FF", pt.size = 0.1) + Blank_Theme() + NoLegend()+ Blank_Theme()  
+p3 <- DimPlot(subset(mergeAll_5_down),  cells.highlight = colnames(mergeAll_5[,mergeAll_5$RV=="Ascl1WTBcl2"]),  cols.highlight = "turquoise", pt.size = 0.1) + Blank_Theme() + NoLegend()+ Blank_Theme() 
+p4 <- DimPlot(subset(mergeAll_5_down),  cells.highlight = colnames(mergeAll_5[,mergeAll_5$RV=="Ascl1SA6"]),   cols.highlight = "#DB7093", pt.size = 0.1) + Blank_Theme() + NoLegend()+ Blank_Theme() 
+p5 <- DimPlot(subset(mergeAll_5_down),  cells.highlight = colnames(mergeAll_5[,mergeAll_5$RV=="Ascl1SA6Bcl2"]),  cols.highlight = "purple", pt.size = 0.1) + Blank_Theme() + NoLegend()+ Blank_Theme() 
+(p1 | p2 | p3| p4 | p5)
+```
+
+
+# Cluster renaming
+```{r}
+
+Idents(mergeAll_5) <- "seurat_clusters"
+map <- c(
+  "0"="Interm-1","1"="Adv-Neuronal-1","2"="Astro-L","3"="Microglia",
+  "4"="OPCs","5"="Astro-L","6"="Adv-Neuronal-1","7"="Adv-Neuronal-1",
+  "8"="Interm-1","9"="Interm-2","10"="E-Neuronal","11"="Astrocytes",
+  "12"="E-Neuronal","13"="Astrocytes","14"="Adv-Neuronal-1","15"="Adv-Neuronal-1",
+  "16"="Adv-Neuronal-1","17"="Adv-Neuronal-1","18"="Microglia","19"="Interm-2",
+  "20"="Adv-Neuronal-2","21"="Astrocytes","22"="Cycling_Astro","23"="OPCs",
+  "24"="E-Neuronal","25"="Cycling_Astro","26"="Oligodendrocytes","27"="Cycling_Astro",
+  "28"="Cycling_Astro","29"="Adv-Neuronal-2","30"="Cycling_OPCs","31"="Microglia",
+  "32"="Microglia","33"="Astrocytes","34"="Cycling_OPCs","35"="Astrocytes",
+  "36"="Cycling_Astro","37"="Microglia","38"="Oligodendrocytes","39"="Cycling_OPCs",
+  "40"="Microglia","41"="Cycling_Astro","42"="Pericytes"
+)
+mergeAll_5 <- RenameIdents(mergeAll_5, map)
+# Stash new identity
+mergeAll_5 <- StashIdent(mergeAll_5, save.name="cell.type")
+mergeAll_5[["cell.type"]] <- Idents(mergeAll_5)
+DimPlot(mergeAll_5, group.by="cell.type", pt.size=0.5)
+```
+
+### remove unknown cluster 
+```{r}
+mergeAll_5 <- subset(mergeAll_5, subset = seurat_clusters %in% c(36), invert = TRUE)
+DimPlot(mergeAll_5, group.by = 'seurat_clusters', pt.size = 0.5, label = TRUE)
+DimPlot(mergeAll_5, group.by="cell.type", pt.size=0.5)
+```
+# Define the colors for each cell type, Fig. 1d
+```{r}
+cell_type_colors <- c(
+  "Cycling_OPCs" = "#B8D0E1",
+  "OPCs" = "#A7BDD3",
+    "Interm-2" = "#6A8B9E",
+  "Adv-Neuronal-2" = "#2F4F61",
+  "Oligodendrocytes" = "#708090",
+   "Astrocytes" = "#A0C0B0",
+  "Cycling_Astro" = "#ACE1AF", 
+  "Astro-L" = "#8FBC8F", 
+  "Interm-1" = "#8F9D53",
+  "E-Neuronal" = "#006400",
+  "Adv-Neuronal-1" = "#2F3826",
+   "Pericytes" = "#A9A9A9",
+     "Microglia" = "#A9A9A9") # "Adv-Neuronal-1" = "#2F3826"
+mergeAll_5@meta.data$cell.type.color <- cell_type_colors[mergeAll_5@meta.data$cell.type]
+DimPlot(object = mergeAll_5,  group.by = "cell.type",  cols = cell_type_colors,label = FALSE,  pt.size = 0.5) + NoLegend() + Blank_Theme() 
+DimPlot(object = mergeAll_5,  group.by = "cell.type", split.by = "RV", cols = cell_type_colors,  pt.size = 0.5)  #& coord_flip()
+```
+#barchart, celltype distribution per RV condition in Astrocyte-to-neurons, Fig. 1e
+```{r}
+OPC <- subset(mergeAll_5, subset = cell.type %in% c( "OPCs" ,"Cycling_OPCs", "Interm-2", "Adv-Neuronal-2" , "Oligodendrocytes"))
+dittoBarPlot(OPC, "cell.type", group.by = "RV", x.reorder = c(5,3,4,1,2), var.labels.reorder = c(1, 3, 2, 5 ,4)) + scale_fill_manual(values = c( "Cycling_OPCs" = "#B8D0E1",
+  "OPCs" = "#A7BDD3",
+    "Interm-2" = "#6A8B9E",
+  "Adv-Neuronal-2" = "#2F4F61",
+  "Oligodendrocytes" = "#708090"))
+```
+#barchart, celltype distribution per RV condition in Astrocyte-to-neurons, Fig. 1e
+```{r Cluster names, warning = FALSE, message = FALSE}
+A2N_5<- subset(mergeAll_5, subset = cell.type %in% c("Astrocytes", "Cycling_Astro", "Astro-L", "Interm-1", "E-Neuronal", "Adv-Neuronal-1"))
+dittoBarPlot(A2N_5, "cell.type", group.by = "RV", x.reorder = c(5,3,4,1,2), var.labels.reorder = c(6,5, 4, 1, 3, 2)) + scale_fill_manual(values = c( "Astrocytes" = "#A0C0B0",
+  "Cycling_Astro" = "#ACE1AF", 
+  "Astro-L" = "#8FBC8F", 
+  "Interm-1" = "#8F9D53",
+  "E-Neuronal" = "#006400",
+  "Adv-Neuronal-1" = "#2F3826"
+ ))
+```
+#FeaturePlots for Fig 1f
+```{r}
+FeaturePlot(mergeAll_5, features = c("Cspg4", "Aldh1l1", "Tubb3","Rbfox3", "Srrm4"), cols = c("lightgrey", "black")) + plot_layout(ncol = 5) & Blank_Theme() 
+```
+
+```{r install.data, eval=FALSE, include=FALSE}
+saveRDS(mergeAll_5, '/4dpi_merge5_allCells.rds')
+```
+
+
+```{r install.data, eval=FALSE, include=FALSE}
+mergeAll_5 <- readRDS('/4dpi_merge5_allCells.rds')
+```
+#### Extended data Fig.1 b
+```{r}
+mergeAll_5$Mscarlet_status <- FetchData(mergeAll_5, vars = "Mscarlet3LTR")[,1]
+Idents(mergeAll_5) <- "Mscarlet3LTR"
+DimPlot(mergeAll_5, group.by = "Mscarlet3LTR", cols = c("blue", "red"))  & Blank_Theme()
+dittoBarPlot( mergeAll_5,  var = "Mscarlet_status",  group.by = "cell.type",  scale = "percent", x.reorder = c(4,5,3,8,7, 1,12,6,9,2,11,10,13), var.labels.reorder = c(2,1)) + scale_fill_manual(values = c("Neg"="blue","Pos"="red")) +  theme_minimal() + theme(axis.text.x = element_text(angle=45, hjust=1, vjust=1))
+
+```
+
+## barchart cell distribution for each RV condition 
+```{r}
+library(ggplot2); library(dplyr); library(scales)
+
+cell_order <- c("Astrocytes", "Cycling_Astro", "Astro-L", "Interm-1",  "E-Neuronal", "Adv-Neuronal-1", "OPCs", "Cycling _OPCs", "Interm-2", "Adv-Neuronal-2","Oligodendrocytes",  "Microglia", "Pericytes")
+
+RV_order <- c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2")
+
+colors <- c(
+  "Cycling  OPCs" = "#B8D0E1", "OPCs" = "#A7BDD3", "Interm-2" = "#6A8B9E",
+  "Adv-Neuronal-2" = "#2F4F61", "Oligodendrocytes" = "#708090", "Astrocytes" = "#A0C0B0",
+  "Cycling_Astro" = "#ACE1AF", "Astro-L" = "#8FBC8F", "Interm-1" = "#8F9D53",
+  "E-Neuronal" = "#006400", "Adv-Neuronal-1" = "#2F3826", 
+  "Pericytes" = "lightpink", "Microglia" = "#A9A9A9"
+)
+
+df <- as.data.frame(mergeAll_5@meta.data) %>%
+  filter(RV %in% RV_order, cell.type %in% cell_order) %>%
+  group_by(RV, cell.type) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(RV) %>%
+  mutate(percent = n / sum(n),
+         cell.type = factor(cell.type, levels = cell_order),
+         RV = factor(RV, levels = RV_order))
+
+ggplot(df, aes(x = RV, y = percent, fill = cell.type)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = percent(percent, accuracy = 0.1)), 
+            position = position_stack(vjust = 0.5), size = 0) +
+  scale_fill_manual(values = colors) +
+  labs(x = NULL, y = "Percentage") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+###FeaturePlots for Extended Fig. 2a. 
+```{r}
+library(patchwork)
+astro_genes <- c("Gfap", "Aldh1l1", "Sox9", "Aqp4") 
+opc_genes <- c("Sox10", "Cspg4", "Olig1", "Pdgfra")
+microglia_genes <- c("Aif1", "Itgam", "Cd68", "Fcrls")
+pericyte_genes <- c("Anpep", "Des", "Pdgfrb", "Rgs5")
+Cycling_Astro_genes <- c("Top2a", "Mcm2", "Mki67", "Pcna")
+neuronal_genes <- c("Dll1", "Dcx", "Srrm4", "Myt1l")
+Intermediate_genes <- c("Hey1", "Hes5", "Notch1","Hes1")
+oligodendrocyte_genes <- c("Mbp", "Myrf", "Mog", "Mag")
+plot_gene_row <- function(genes) {
+  plots <- lapply(genes, function(gene) {
+    FeaturePlot(mergeAll_5, features = gene, max.cutoff = 1.5, reduction = "umap") & Blank_Theme()
+  })
+  wrap_plots(plots, ncol = length(genes))
+}
+row1 <- plot_gene_row(Cycling_Astro_genes)
+row2 <- plot_gene_row(astro_genes)
+row3 <- plot_gene_row(Intermediate_genes)
+row4 <- plot_gene_row(neuronal_genes)
+row5 <- plot_gene_row(opc_genes)
+row6 <- plot_gene_row(oligodendrocyte_genes)
+row7 <- plot_gene_row(pericyte_genes)
+row8 <- plot_gene_row(microglia_genes)
+final_plot <- row1 / row2 / row3 / row4 / row5 / row6 / row7 / row8
+final_plot
+```
+
+### Cell cycle phases in Dimplot Extended Fig. 2b
+```{r}
+DimPlot(mergeAll_5, group.by = "Phase", pt.size = 0.5, cols = c("G1" = "#6495ED", "G2M" = "#8B0000", "S" = "#F7C300")) + Blank_Theme()
+```
+
+
+```{r}
+DimPlot(mergeAll_5, group.by = "RV", pt.size = 0.5, cols = c("black","#1E90FF","turquoise","#DB7093","purple")) + Blank_Theme()
+```
+
+## OPCs Extended Data: Fig 3a/b 
+```{r Cluster names, warning = FALSE, message = FALSE}
+
+ cell_type_colors <- c(
+  "Cycling_OPCs" = "#B8D0E1", "OPCs" = "#A7BDD3", "Interm-2" = "#6A8B9E",
+  "Adv-Neuronal-2" = "#2F4F61", "Oligodendrocytes" = "#708090", "Astrocytes" = "#A0C0B0",
+  "Cycling_Astro" = "#ACE1AF", "Astro-L" = "#8FBC8F", "Interm-1" = "#8F9D53",
+  "E-Neuronal" = "#006400", "Adv-Neuronal-1" = "#2F3826", 
+  "Pericytes" = "lightpink", "Microglia" = "#A9A9A9"
+)
+Idents(mergeAll_5) <- "cell.type"
+OPC <- subset(mergeAll_5, subset = cell.type %in% c(  "Cycling_OPCs", "OPCs", "Interm-2", "Adv-Neuronal-2" , "Oligodendrocytes"))
+DimPlot(object = subset(OPC), group.by = "cell.type", cols = cell_type_colors,  pt.size = 0.5) & Blank_Theme()
+DimPlot(object = subset(OPC), group.by = "cell.type", cols = cell_type_colors,  pt.size = 0.5, split.by = "RV") & Blank_Theme()
+
+```
+## OPCs Extended Data: Fig 3c
+```{r celltype marker, fig.height = 8, fig.width = 12}
+FeaturePlot(OPC, features = c( "Myrf", "Mbp","Mog",'Top2a', "Vim", "Aldoc","Sox9","Sox10","Cspg4", "Cspg5","Pdgfra","Dll3", "Hes5", "Notch1", "Dcx", "Sox11", 'Tubb3' ,"Rbfox3"), ncol = 6) & Blank_Theme()
+```
+
+## Microglia Extended Data: Fig 3d 
+```{r}
+Microglia <- subset(mergeAll_5, subset = cell.type %in% c("Microglia"))
+Microglia2<- NormalizeData(object = Microglia)
+Microglia2<- FindVariableFeatures(object = Microglia2)
+Microglia2<- ScaleData(object = Microglia2)
+Microglia2<- RunPCA(object = Microglia2)
+Microglia2<- FindNeighbors(object = Microglia2, dims = 1:10)
+Microglia2<- FindClusters(object = Microglia2, resolution = 0.1)
+Microglia2<- RunUMAP(object = Microglia2, dims = 1:10)#seed.use =100,
+DimPlot(Microglia2, group.by = 'RV', pt.size = 0.5) + Blank_Theme() 
+DimPlot(Microglia2, group.by = 'Phase', pt.size = 0.5) + Blank_Theme() 
+```
+## Microglia Extended Data: Fig 3e
+```{r}
+FeaturePlot(Microglia2, c("Apoe", "P2ry12","Tmem119", "Sall1" ,"Mrc1","Itgax", "Aif1", "Itgam", "Cd68", "Fcrls", "Gpr34", "Olfml3","Selplg", "Ctss", "C1qa","Sox11", "Dcx","Rbfox3","Srrm4", "Myt1l"),reduction = "umap") & Blank_Theme()
+FeaturePlot(Microglia2, c("Aif1", "P2ry12","Rbfox3","Srrm4"),reduction = "umap", ncol = 4) & Blank_Theme()
+DimPlot(Microglia2, group.by = "RV", pt.size = 1, cols = c("black","#1E90FF","turquoise","#DB7093","purple")) + Blank_Theme()
+```
+
+
+
+```{r}
+VlnPlot(G2N, features=c("Sox1","Sox2","Sox6","Pax6","Lhx2","Zfp423","Pou2f2","Hdac8","Hdaac9"), group.by="Glia", split.by="Glia", cols=c("#A7BDD3","#A0C0B0"), pt.size=0, stack=TRUE, flip=TRUE)
+
+VlnPlot(G2N, features=c("Sox1","Sox2","Sox6","Pax6"), group.by="Glia", split.by="Glia", cols=c("#A7BDD3","#A0C0B0"), pt.size=0, stack=TRUE, flip=TRUE)
+```
+
+
+
+
+
+

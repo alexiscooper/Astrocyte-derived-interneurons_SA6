@@ -1,0 +1,531 @@
+---
+title: "Figure 4"
+output: html_document
+date: "2025-10-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, message=FALSE, warning=FALSE, include=FALSE}
+library(Seurat)
+library(SeuratDisk)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(tidyverse)
+library(RColorBrewer)
+library(dittoSeq)
+library(Nebulosa)
+library(dplyr)
+library(magrittr)
+library(patchwork)
+library(scCustomize)
+library(qs)
+library(viridis)
+```
+
+
+```{r install.data, eval=FALSE, include=FALSE}
+mergeAll_filtered <- readRDS("/seurat_4dpi_merged_LogNorm_newID_3000_removedlowcounts.rds")
+```
+
+```{r}
+mergeAll_filtered<- FindClusters(object = mergeAll_filtered, resolution = 0.05)
+DimPlot(mergeAll_filtered, group.by = "seurat_clusters", shuffle = TRUE)
+```
+
+```{r Cluster names, warning = FALSE, message = FALSE}
+Idents(mergeAll_filtered) <- "seurat_clusters"
+mergeAll_filtered<- RenameIdents(mergeAll_filtered,
+   `0` = "Astro", 
+`3` = "Microglia",
+`1` = "Astro",
+`2` = "OPCs",
+`4` = "Astro", 
+    `5` = "P2N", 
+    `6` = "Unknown")
+mergeAll_filtered <- StashIdent(mergeAll_filtered, save.name = 'cluster')
+mergeAll_filtered[["cluster"]] <- Idents(object = mergeAll_filtered)
+DimPlot(mergeAll_filtered, group.by = 'cluster', pt.size = 0.5) + Blank_Theme() 
+```
+
+```{r}
+mergeAll_filtered$RV <- factor(mergeAll_filtered$RV,levels=c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1WTSA6","Ascl1SA6Bcl2","Ascl1SA6", "Ascl1SA62", "Ascl1SA6Dlx2","SA6Dlx2", "Ascl1SA6Dlx2Bcl2", "Ascl1WTDlx2", "Dlx2"))
+```
+
+```{r Cluster names, warning = FALSE, message = FALSE}
+A2N <- subset(mergeAll_filtered, subset = cluster %in% c("Astro"))
+```
+
+```{r Visualisation, warning = FALSE, message = FALSE, , fig.width=6, fig.height=4 }
+print(table(A2N$RV))
+Idents(A2N) <- "RV"
+A2N <- subset(A2N, downsample=1500)
+print(table(A2N$RV))
+```
+
+```{r}
+A2N2<- NormalizeData(object = A2N)
+A2N2<- FindVariableFeatures(object = A2N2)
+A2N2<- ScaleData(object = A2N2)
+A2N2<- RunPCA(object = A2N2)
+A2N2<- FindNeighbors(object = A2N2, dims = 1:23)
+A2N2<- FindClusters(object = A2N2, resolution = 1.6)
+A2N2<- RunUMAP(object = A2N2, dims = 1:21)#seed.use =100,
+DimPlot(A2N2, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend() & Blank_Theme() 
+DimPlot(A2N2, group.by = 'seurat_clusters', pt.size = 0.5, label=TRUE) + Blank_Theme() 
+DimPlot(A2N2, group.by = 'RV', pt.size = 0.5, label=FALSE) + Blank_Theme() 
+DimPlot(A2N2, group.by = 'Phase', pt.size = 0.5, label=TRUE) + Blank_Theme() 
+### remove low count cells 
+A2N2 <- subset(A2N2, subset = seurat_clusters %in% c(27, 19, 28), invert = TRUE)
+A2N2<- FindClusters(object = A2N2, resolution = 1.7)
+DimPlot(A2N2, group.by = 'seurat_clusters', pt.size = 0.5, label=TRUE) + Blank_Theme() 
+```
+
+```{r install.data, eval=FALSE, include=FALSE}
+A2N2 <- readRDS("4dpi_A2N2_1500.rds")
+```
+
+
+### Figure 4d 
+```{r}
+RV_cols <- c("Control"="black","Ascl1SA6Bcl2"="#9400D3","SA6Dlx2"="#32CD32"); 
+DimPlot(subset(A2N2, RV %in% names(RV_cols)), group.by="RV", cols=RV_cols, reduction="umap", pt.size=0.5, label=FALSE) + Blank_Theme()
+```
+```{r}
+RV_cols <- c("Control"="black","Ascl1WTBcl2"="turquoise","Ascl1SA6Bcl2"="#9400D3","Dlx2"="#4B7A5D","SA6Dlx2"="#32CD32"); 
+DimPlot(subset(A2N2, RV %in% names(RV_cols)), group.by="RV", cols=RV_cols, reduction="umap", pt.size=0.5, label=FALSE) + Blank_Theme()
+```
+
+
+## preperation for Figures 
+```{r Cluster names, warning = FALSE, message = FALSE}
+Idents(A2N2) <- "seurat_clusters"
+A2N2<- RenameIdents(A2N2,
+`0` = "Adv-Neuronal-1", 
+`1` = "Interm-1",
+`2` = "Adv-Neuronal-1",
+`3` = "Interm-1",
+`4` = "E-Neuronal", 
+ `5` = "E-Neuronal", 
+`6` = "Interm-1",
+`7` = "Astro-L", 
+`8` = "Adv-Neuronal-1",
+`9` = "Cycling_Astro",
+`10` = "Cycling_Astro",
+`11` = "Adv-Neuronal-1", 
+`12` = "Astro-L",
+`13` = "Astrocytes",
+`14` = "Adv-Neuronal-1",
+`15` = "Astrocytes", 
+`16` = "Astrocytes", 
+`17` = "Cycling_Astro",
+ `18` = "Cycling_Astro", 
+`19` = "E-Neuronal",
+`20` = "E-Neuronal",
+`21` = "Adv-Neuronal-1",
+`22` = "E-Neuronal",
+ `23` = "Cycling_Astro", 
+`24` = "Adv-Neuronal-1",
+`25` = "Adv-Neuronal-1", 
+`26` = "Astrocytes",
+`27` = "Astrocytes",
+`28` = "Cycling_Astro")
+A2N2 <- StashIdent(A2N2, save.name = 'cell.type')
+A2N2[["cell.type"]] <- Idents(object = A2N2)
+DimPlot(A2N2, group.by = 'cell.type', pt.size = 0.5, label=TRUE) + Blank_Theme() 
+```
+
+
+
+
+### Figure 4e
+```{r}
+library(Seurat)
+library(ggplot2)
+library(ggrepel)
+
+A2N2_4 <- subset(A2N2, subset = RV %in% c("Control","Dlx2","Ascl1WTBcl2","Ascl1SA6Bcl2","SA6Dlx2"))
+Idents(A2N2_4) <- "RV"
+A2N2_4$RV <- factor(A2N2_4$RV,levels=c("Control","Ascl1WTBcl2","Ascl1SA6Bcl2","Dlx2","SA6Dlx2"))
+A2N2_4 <- JoinLayers(A2N2_4)
+neuronlike_cells <- subset(A2N2_4, subset = cell.type %in% c("Adv-Neuronal-1") & RV %in% c("Ascl1SA6Bcl2", "SA6Dlx2"))
+Idents(neuronlike_cells) <- neuronlike_cells$RV
+table(neuronlike_cells$seurat_clusters, neuronlike_cells$RV)
+neuronlike_cells <- JoinLayers(neuronlike_cells)
+DEG <- FindMarkers(neuronlike_cells, ident.1 = "SA6Dlx2", ident.2 = "Ascl1SA6Bcl2", logfc.threshold = 0, min.pct = 0.1)
+DEG$diffexpressed <- "NO"
+DEG$diffexpressed[DEG$avg_log2FC > 0.5 & DEG$p_val_adj < 0.05] <- "UP"
+DEG$diffexpressed[DEG$avg_log2FC < -0.5 & DEG$p_val_adj < 0.05] <- "DOWN"
+top25_up <- head(rownames(DEG[DEG$diffexpressed == "UP", ][order(DEG[DEG$diffexpressed == "UP", ]$p_val_adj), ]), 1)
+top25_down <- head(rownames(DEG[DEG$diffexpressed == "DOWN", ][order(DEG[DEG$diffexpressed == "DOWN", ]$p_val_adj), ]), 1)
+custom_genes <- c("Pvalb", "Dlx2", "Dlx1", "Robo1","Robo2", "Olig1","Olig2", "Dlx5", "Dlx6","Gad1", "Gad2", "Dlx1as", "Sp9", "Arx", "St18","Shisa9","Rbfox3" , "Nav2", "Syt6","Mef2d", "Sox6", "Prdx5","Ckb", "St18", "Dlx6os1", "Sox2ot", "Nrxn3", "Dlx1a", "Syt6", "Dll1")
+top_genes <- unique(c(top25_up, top25_down, custom_genes))
+DEG$delabel <- ifelse(rownames(DEG) %in% top_genes, rownames(DEG), NA)
+
+ggplot(DEG, aes(avg_log2FC, -log10(p_val_adj))) +
+  geom_point(aes(color = diffexpressed, alpha = diffexpressed), size = 2.5) +
+  scale_color_manual(values = c(DOWN = "purple", NO = "grey", UP = "#32CD32")) +
+  scale_alpha_manual(values = c(DOWN = 0.2, NO = 0.4, UP = 0.6)) +
+  geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", color = "gray") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray") +
+  geom_text_repel(aes(label = delabel), size = 6, color = "black", segment.color = "black", box.padding = 0.5, max.overlaps = 100) +
+  labs(x = "log2 Fold Change", y = "-log10(p-adj)", title = "Volcano Plot: SA6Dlx2 vs Ascl1SA6Bcl2", color = "Diff Expr", alpha = NULL) +
+  guides(alpha = "none") +
+  theme_minimal(base_family = "Arial") +
+  theme(panel.background = element_blank(), panel.grid = element_blank(),
+        plot.background = element_rect(fill = "white", color = NA),
+        axis.text = element_text(color = "black"),
+        axis.title = element_text(color = "black"),
+        plot.title = element_text(color = "black"),
+        legend.background = element_rect(fill = "white"),
+        legend.text = element_text(color = "black"),
+        legend.title = element_text(color = "black"))
+```
+
+
+### Figure 4f umap
+
+```{r}
+library(scCustomize)
+library(patchwork)
+
+A2N2_3 <- subset(A2N2, subset = RV %in% c("Control",  "Ascl1SA6Bcl2","SA6Dlx2"))
+Idents(A2N2_3) <- "RV"
+A2N2_3$RV <- factor(A2N2_3$RV,levels=c("Control",  "Ascl1SA6Bcl2","SA6Dlx2"))
+A2N2_3 <- JoinLayers(A2N2_3)
+fp <- FeaturePlot_scCustom( seurat_object = A2N2_3, features = c("Olig1","Olig2"),  colors_use = colorRampPalette(c("white","grey","#6495ED","#00008B", "black"))(100), combine = FALSE)
+(fp_clean <- wrap_plots(lapply(fp, function(p) p + Blank_Theme()), ncol = 1))
+```
+```{r}
+library(scCustomize)
+library(patchwork)
+
+A2N2_3 <- subset(A2N2, subset = RV %in% c("Control",  "Ascl1SA6Bcl2","SA6Dlx2"))
+Idents(A2N2_3) <- "RV"
+A2N2_3$RV <- factor(A2N2_3$RV,levels=c("Control",  "Ascl1SA6Bcl2","SA6Dlx2"))
+A2N2_3 <- JoinLayers(A2N2_3)
+fp <- FeaturePlot_scCustom( seurat_object = A2N2_3, features = c("Htr3a"),  colors_use = colorRampPalette(c("white","grey","#6495ED","#00008B", "black"))(100), combine = FALSE)
+(fp_clean <- wrap_plots(lapply(fp, function(p) p + Blank_Theme()), ncol = 1))
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Fetch expression + RV for only cells with Htr3a
+df <- FetchData(A2N2_3, vars = c("Htr3a")) %>%
+  mutate(Cell = rownames(.)) %>%
+  left_join(
+    data.frame(Cell = colnames(A2N2_3), RV = Idents(A2N2_3)),
+    by = "Cell"
+  )
+
+# Plot with 3 colors (add black for the third RV)
+df %>%
+  pivot_longer(cols = c(Htr3a), names_to = "Gene", values_to = "Expr") %>%
+  ggplot(aes(Gene, Expr, fill = RV)) +
+  geom_boxplot(position = position_dodge(0.8)) +
+  scale_fill_manual(values = c( "black","#9400D3", "#32CD32")) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid = element_blank()) +
+  labs(y = "Expression", x = "Gene", title = "Htr3a by RV")
+
+```
+
+
+
+
+
+```{r}
+library(scCustomize)
+library(patchwork)
+
+A2N2_WT <- subset(A2N2, subset = RV %in% c("Control","Dlx2","Ascl1WT", "Ascl1WTDlx2"))
+Idents(A2N2_WT) <- "RV"
+A2N2_WT$RV <- factor(A2N2_WT$RV,levels=c("Ascl1WT", "SA6Dlx2", "Ascl1SA6Dlx2Bcl2", "Ascl1WTDlx2", "Dlx2"))
+A2N2_WT <- JoinLayers(A2N2_WT)
+fp <- FeaturePlot_scCustom( seurat_object = A2N2_WT, features = c("Olig1","Olig2"),  colors_use = colorRampPalette(c("white","grey","#6495ED","#00008B", "black"))(100), combine = FALSE)
+(fp_clean <- wrap_plots(lapply(fp, function(p) p + Blank_Theme()), ncol = 1))
+```
+
+### Slingshot lineages for 5 samples Fig 3d
+```{r}
+library(slingshot)
+A2N2_3 <- JoinLayers(A2N2_3)
+sce <- as.SingleCellExperiment(A2N2_3, assay = "RNA")
+sce_cl3 <- slingshot(sce,
+                     clusterLabels = "cell.type",
+                     start.clus = c("Cycling_Astro"), ### cluster from unbiased latent time 
+                     approx_points = 200,
+                     extend = "n",
+                     reducedDim = "UMAP")
+
+slingLineages(sce_cl3)
+
+A2N2_3$Pseudotime_1 <- sce_cl3$slingPseudotime_1
+A2N2_3$Pseudotime_2 <- sce_cl3$slingPseudotime_2
+A2N2_3$Pseudotime_3 <- sce_cl3$slingPseudotime_3
+A2N2_3$Pseudotime_4 <- sce_cl3$slingPseudotime_4
+A2N2_3$Pseudotime_5 <- sce_cl3$slingPseudotime_5
+A2N2_3$Pseudotime_6 <- sce_cl3$slingPseudotime_6
+A2N2_3$Pseudotime_7 <- sce_cl3$slingPseudotime_7
+A2N2_3$Pseudotime_8 <- sce_cl3$slingPseudotime_8
+A2N2_3$Pseudotime_9 <- sce_cl3$slingPseudotime_9
+A2N2_3$Pseudotime_10 <- sce_cl3$slingPseudotime_10
+
+library(ggpubr); library(viridis); library(purrr); library(stringr)
+curves <- map(1:2, ~ slingCurves(sce_cl3)[[.x]]$s[slingCurves(sce_cl3)[[.x]]$ord, ] %>%
+  as.data.frame() %>% setNames(c("umap_1", "umap_2")))
+plots <- map(1:2, ~ FeaturePlot(A2N2_3, features = str_c("Pseudotime_", .x), reduction = "umap") +
+  scale_colour_viridis() + Blank_Theme() +
+  geom_path(data = curves[[.x]], aes(x = umap_1, y = umap_2)))
+ggarrange(plotlist = plots, ncol = 2, nrow = 2)
+
+A2N2_3$Pseudotime_avg <- rowMeans(slingPseudotime(sce_cl3)[, c(1,2)], na.rm = TRUE)
+plot_pseudotime <- function(feature_name, curve_index) {
+  FeaturePlot(A2N2_3, features = feature_name, reduction = "umap") +
+    scale_colour_viridis() + 
+    theme_void() +  # Removes background, axes, and grid
+    geom_path(data = as.data.frame(slingCurves(sce_cl3)[[curve_index]]$s[slingCurves(sce_cl3)[[curve_index]]$ord,]),
+              aes(x = umap_1, y = umap_2))
+}
+plot_pseudotime <- function(feature_name, curve_index) {
+  FeaturePlot(A2N2_3, features = feature_name, reduction = "umap") +
+    scale_colour_viridis() + 
+    theme_void() +  # Removes all background, grid, axes, and text
+    theme(
+      panel.grid.major = element_blank(), 
+      panel.grid.minor = element_blank(), 
+      panel.background = element_blank()
+    ) +
+    geom_path(data = as.data.frame(slingCurves(sce_cl3)[[curve_index]]$s[slingCurves(sce_cl3)[[curve_index]]$ord,]),
+              aes(x = umap_1, y = umap_2))
+}
+
+FeaturePlot(A2N2_3, features = "Pseudotime_avg", reduction = "umap") +
+  scale_colour_viridis() + theme_void() 
+```
+
+
+
+
+
+### Figure 4f boxplots
+```{r}
+library(SCpubr)
+Idents(neuronlike_2) <- "RV"
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+FetchData(neuronlike_2, c("Olig1","Olig2")) %>%
+  mutate(RV = Idents(neuronlike_2)) %>%
+  pivot_longer(cols = c(Olig1, Olig2), names_to = "Gene", values_to = "Expr") %>%
+  ggplot(aes(Gene, Expr, fill = RV)) +
+  geom_boxplot(position = position_dodge(0.8)) +
+  scale_fill_manual(values = c("#9400D3", "#32CD32")) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid = element_blank()) +   # ← removes grid lines
+  labs(y = "Expression", x = "Gene", title = "Olig1 and Olig2 by RV")
+
+```
+
+### Figure 4g umap of Dlx2 target genes 
+```{r}
+library(scCustomize)
+library(patchwork)
+
+fp <- FeaturePlot_scCustom(
+  seurat_object = A2N2_3, features = c("Dlx1", "Dlx6", "Sp8","Zeb2","Arx" ,"Mef2c", "Gad1", "Gad2"), colors_use = colorRampPalette(c("white","grey", "#66CDAA","#2E8B57", "black"))(100), combine = FALSE)
+(fp_clean <- wrap_plots(lapply(fp, function(p) p + Blank_Theme()), ncol = 4))
+```
+
+
+### Figure 4h umap and boxplot of Pvalb expression 
+```{r}
+FeaturePlot_scCustom(subset(A2N2_3), features = "Pvalb", colors_use =colorRampPalette(c("white","grey","#800080","#2E0854","black"))(100)) & Blank_Theme()
+boxplot_obj2 <- SCpubr::do_BoxPlot(sample = A2N2_3, feature = "Pvalb", split.by = "RV")
+boxplot_obj2 <- boxplot_obj2 + scale_fill_manual(values = c("black", "turquoise","#9400D3","#4B7A5D", "#32CD32"))
+boxplot_obj2 + theme_void() + theme(legend.position = "right")
+
+```
+
+```{r}
+library(SCpubr)
+Idents(neuronlike_2) <- "RV"
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+FetchData(neuronlike_2, c("Pvalb")) %>%
+  mutate(RV = Idents(neuronlike_2)) %>%
+  pivot_longer(cols = c(Pvalb), names_to = "Gene", values_to = "Expr") %>%
+  ggplot(aes(Gene, Expr, fill = RV)) +
+  geom_boxplot(position = position_dodge(0.8)) +
+  scale_fill_manual(values = c("#9400D3", "#32CD32")) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),   # still remove grid
+    axis.line = element_line()      # add back x/y axis lines
+  ) +
+  labs(y = "Expression", x = "Gene", title = "Olig1 and Olig2 by RV")
+```
+
+
+```{r}
+library(SCpubr)
+Idents(neuronlike_2) <- "RV"
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+FetchData(neuronlike_2, c("Kcnc1")) %>%
+  mutate(RV = Idents(neuronlike_2)) %>%
+  pivot_longer(cols = c(Kcnc1), names_to = "Gene", values_to = "Expr") %>%
+  ggplot(aes(Gene, Expr, fill = RV)) +
+  geom_boxplot(position = position_dodge(0.8)) +
+  scale_fill_manual(values = c("#9400D3", "#32CD32")) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.grid = element_blank(),   # still remove grid
+    axis.line = element_line()      # add back x/y axis lines
+  ) +
+  labs(y = "Expression", x = "Gene", title = "Kcnc1 by RV")
+
+VlnPlot(A2N2_3, features = c( "Kcnc1"), cols = c("black","#9400D3", "#32CD32", ncol(4 )), pt.size = 0) 
+```
+
+### Figure 4i umap and boxplot of Pvalb expression 
+```{r}
+A2N2_fin <- subset(A2N2, subset = RV %in% c("Control","Ascl1SA6Bcl2","SA6Dlx2","Ascl1SA6Dlx2Bcl2"))
+Idents(A2N2_fin) <- "RV"
+A2N2_fin$RV <- factor(A2N2_fin$RV,levels=c("Control","Ascl1SA6Bcl2","SA6Dlx2","Ascl1SA6Dlx2Bcl2"))
+DimPlot(A2N2_fin,  reduction = "umap", group.by = "RV",  pt.size = 1, cols = c("black","#9400D3", "#32CD32", "#FDD835")) & Blank_Theme()
+```
+### Figure 4j umap of Pvalb expression 
+```{r}
+FeaturePlot_scCustom(subset(A2N2_fin, RV %in% c("Ascl1SA6Bcl2", "Ascl1SA6Dlx2Bcl2")), features = "Pvalb", pt.size=0.5, split.by = "RV", colors_use =colorRampPalette(c("white","grey","#800080","#2E0854","black"))(100)) & Blank_Theme()
+```
+
+
+### Extended Data Figure 9b 
+```{r}
+RV_cols <- c("Control"="black","Ascl1WT"="#1E90FF","Ascl1WTBcl2"="turquoise","Ascl1SA6"="#DB7093","Ascl1SA6Bcl2"="#9400D3","Dlx2"="#4B7A5D","Ascl1WTDlx2"="#6B8E23","SA6Dlx2"="#32CD32","Ascl1SA6Dlx2Bcl2"="#FDD835"); 
+DimPlot(subset(A2N2, RV %in% names(RV_cols)), group.by="RV", cols=RV_cols, reduction="umap", pt.size=0.5, label=FALSE) + Blank_Theme()
+```
+
+### Extended Data Figure 9c 
+```{r}
+p1  <- DimPlot(A2N2, reduction = "umap", cells.highlight = colnames(A2N2[, A2N2$RV == "Control"]),  cols.highlight = "black")       + ggtitle("Control")           + NoLegend() + Blank_Theme()
+p2  <- DimPlot(A2N2, reduction = "umap", cells.highlight = colnames(A2N2[, A2N2$RV == "Ascl1WT"]),  cols.highlight = "#1E90FF")     + ggtitle("Ascl1WT")          +  NoLegend() + Blank_Theme()
+p3  <- DimPlot(A2N2, reduction = "umap", cells.highlight = colnames(A2N2[, A2N2$RV == "Ascl1WTBcl2"]), cols.highlight = "turquoise")   + ggtitle("Ascl1WTBcl2")       + NoLegend() + Blank_Theme()
+p4  <- DimPlot(A2N2, reduction = "umap", cells.highlight = colnames(A2N2[, A2N2$RV == "Ascl1SA6"]), cols.highlight = "#DB7093")     + ggtitle("Ascl1SA6")          + NoLegend() + Blank_Theme()
+p5  <- DimPlot(A2N2, reduction = "umap", cells.highlight = colnames(A2N2[, A2N2$RV == "Ascl1SA6Bcl2"]),  cols.highlight = "#9400D3")     + ggtitle("Ascl1SA6Bcl2")      + NoLegend() + Blank_Theme()
+p6  <- DimPlot(A2N2, reduction = "umap", cells.highlight = colnames(A2N2[, A2N2$RV == "Dlx2"]), cols.highlight = "#4B7A5D")     + ggtitle("Dlx2")              + NoLegend() + Blank_Theme()
+p7  <- DimPlot(A2N2, reduction = "umap", cells.highlight = colnames(A2N2[, A2N2$RV == "Ascl1WTDlx2"]), cols.highlight = "#6B8E23")    + ggtitle("Ascl1WTDlx2")       + NoLegend() + Blank_Theme()
+p8 <- DimPlot(A2N2, reduction = "umap", cells.highlight = colnames(A2N2[, A2N2$RV == "SA6Dlx2"]), cols.highlight = "#32CD32")     + ggtitle("SA6Dlx2")           + NoLegend() + Blank_Theme()
+p9 <- DimPlot(A2N2, reduction = "umap", cells.highlight = colnames(A2N2[, A2N2$RV == "Ascl1SA6Dlx2Bcl2"]), cols.highlight = "#FDD835")     + ggtitle("Ascl1SA6Dlx2Bcl2")  + NoLegend() + Blank_Theme()
+(p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8+ p9) + plot_layout(ncol = 4)
+```
+
+### Extended Data Figure 9d
+```{r Cluster names, warning = FALSE, message = FALSE}
+cell_type_colors <- c( "Astrocytes" = "#A0C0B0", "Cycling_Astro" = "#ACE1AF",  "Astro-L" = "#8FBC8F",  "Interm-1" = "#8F9D53", "E-Neuronal" = "#006400", "Adv-Neuronal-1" = "#2F3826")
+A2N2@meta.data$cell.type.color <- cell_type_colors[A2N2@meta.data$cell.type]
+A2N2$cell.type <- factor(A2N2$cell.type, levels = c("Astrocytes","Cycling_Astro", "Astro-L", "Interm-1", "E-Neuronal" ,"Adv-Neuronal-1"))
+DimPlot(subset(A2N2, RV %in% c("Control","Ascl1WT","Ascl1WTBcl2","Ascl1SA6","Ascl1SA6Bcl2","Dlx2","Ascl1WTDlx2","SA6Dlx2","Ascl1SA6Dlx2Bcl2")), group.by="cell.type", cols=cell_type_colors, label=FALSE, pt.size=0.5) + NoLegend() + Blank_Theme()
+FeaturePlot(subset(A2N2, RV %in% c("Control","Ascl1WT","Ascl1WTBcl2","Ascl1SA6","Ascl1SA6Bcl2","Dlx2","Ascl1WTDlx2","SA6Dlx2","Ascl1SA6Dlx2Bcl2")), features = c("Mki67","Slc1a3","Aqp4","Aldh1l1","Gfap","Olig1","Olig2","Notch1","Hes5","Sox11","Tubb3","Rbfox3","Srrm4","Dcx"), ncol = 5, reduction = "umap") & Blank_Theme()
+DimPlot(subset(A2N2, RV %in% c("Control","Ascl1WT","Ascl1WTBcl2","Ascl1SA6","Ascl1SA6Bcl2","Dlx2","Ascl1WTDlx2","SA6Dlx2","Ascl1SA6Dlx2Bcl2")), group.by="Phase",  label=FALSE, pt.size=0.5) + NoLegend() + Blank_Theme()
+```
+
+### GO Terms SA6Bcl2 (down) versus SA6Bcl2 (up) for Extended Data Figure 10a 
+```{r}
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(ggplot2)
+library(patchwork)
+
+up_genes <- rownames(DEG[DEG$diffexpressed == "UP", ])
+down_genes <- rownames(DEG[DEG$diffexpressed == "DOWN", ])
+entrez_up <- bitr(up_genes, fromType="SYMBOL", toType="ENTREZID", OrgDb=org.Mm.eg.db)
+entrez_down <- bitr(down_genes, fromType="SYMBOL", toType="ENTREZID", OrgDb=org.Mm.eg.db)
+ego_up <- enrichGO(entrez_up$ENTREZID, OrgDb=org.Mm.eg.db, ont="BP", pAdjustMethod="BH", qvalueCutoff=0.05, readable=TRUE)
+ego_down <- enrichGO(entrez_down$ENTREZID, OrgDb=org.Mm.eg.db, ont="BP", pAdjustMethod="BH", qvalueCutoff=0.05, readable=TRUE)
+p1 <- dotplot(ego_up, showCategory=15, title="UP-regulated Genes", font.size=14, label_format=80) + theme_minimal()
+p2 <- dotplot(ego_down, showCategory=15, title="DOWN-regulated Genes", font.size=14, label_format=80) + theme_minimal()
+p1/p2
+```
+
+### Boxplots for Extended Data Figure 10b
+```{r}
+neuronlike_2 <- subset(A2N2, subset = cell.type %in% c("Adv-Neuronal-1") & RV %in% c("Ascl1WTBcl2","Ascl1SA6Bcl2","SA6Dlx2"))
+neuronlike_2 <- JoinLayers(neuronlike_2)
+library(SCpubr)
+Idents(neuronlike_2) <- "RV"
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+FetchData(neuronlike_2, c("Dlx2")) %>%
+  mutate(RV = Idents(neuronlike_2)) %>%
+  pivot_longer(cols = c(Dlx2), names_to="Gene", values_to="Expr") %>%
+  ggplot(aes(Gene, Expr, fill=RV)) +
+  geom_boxplot(position=position_dodge(0.8)) +
+  scale_fill_manual(values=c("turquoise","#9400D3","#32CD32")) +
+  theme_minimal(14) +
+  labs(y="Expression", x="Gene", title="Dlx2 by RV")
+```
+### Boxplots for Extended Data Figure 10b
+```{r}
+A2N2_Dlx2 <- subset(A2N2, subset = RV %in% c("Control","Dlx2","Ascl1SA6Bcl2", "SA6Dlx2"))
+A2N2_Dlx2$RV <- factor(A2N2_Dlx2$RV,levels=c("Control","Dlx2","Ascl1SA6Bcl2", "SA6Dlx2"))
+
+A2N2_Dlx2 <- JoinLayers(A2N2_Dlx2)
+library(SCpubr)
+Idents(A2N2_Dlx2) <- "RV"
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+FetchData(A2N2_Dlx2, c("Ascl1")) %>%
+  mutate(RV = Idents(A2N2_Dlx2)) %>%
+  pivot_longer(cols = c(Ascl1), names_to="Gene", values_to="Expr") %>%
+  ggplot(aes(Gene, Expr, fill=RV)) +
+  geom_boxplot(position=position_dodge(0.8)) +
+  scale_fill_manual(values=c("black","#4B7A5D","#9400D3","#32CD32")) +
+  theme_minimal(14) +
+  labs(y="Expression", x="Gene", title="Dlx2 by RV")
+```
+
+
+### umap of Dlx2 target genes for Extended Data Figure 10c
+```{r}
+library(scCustomize)
+library(patchwork)
+
+fp <- FeaturePlot_scCustom(
+  seurat_object = A2N2_4, features = c( "Ascl1","Dlx2", "Dlx6","Sp9","Maf","Mafb", "Satb1", "St18"), colors_use = colorRampPalette(c("white","grey", "#66CDAA","#2E8B57", "black"))(100), combine = FALSE)
+(fp_clean <- wrap_plots(lapply(fp, function(p) p + Blank_Theme()), ncol = 5))
+```
+
+```{r}
+FetchData(neuronlike_2, c("Kcnc1")) %>%
+    mutate(RV = Idents(neuronlike_2)) %>%
+    pivot_longer(cols = c(Kcnc1), names_to = "Gene", values_to = "Expr") %>%
+    ggplot(aes(Gene, Expr, fill = RV)) +
+    geom_boxplot(position = position_dodge(0.8)) +
+    scale_fill_manual(values = c("#9400D3", "#32CD32")) +
+    theme_minimal(base_size = 14) +
+    theme(
+        panel.grid = element_blank(),   # still remove grid
+        axis.line = element_line()      # add back x/y axis lines
+    ) +
+    labs(y = "Expression", x = "Gene", title = "Kcnc1 by RV")
+```
+
+
+
+

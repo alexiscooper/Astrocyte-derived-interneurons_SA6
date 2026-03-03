@@ -1,0 +1,969 @@
+---
+title: "Figure 3"
+output: html_document
+date: "2025-10-04"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(Seurat)
+library(SeuratDisk)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(tidyverse)
+library(RColorBrewer)
+library(dittoSeq)
+library(Nebulosa)
+library(dplyr)
+library(magrittr)
+library(patchwork)
+library(scCustomize)
+library(qs)
+library(viridis)
+ library(dittoSeq)
+library(ggtext)
+```
+
+
+```{r install.data, eval=FALSE, include=FALSE}
+mergeAll_5 <- readRDS('/4dpi_merge5_allCells.rds')
+```
+
+```{r}
+selected_cell_types <- c("Astro-L", "Interm-1", "E-Neuronal", "Cycling_Astro",  "Astrocytes", "Adv-Neuronal-1")
+A2N <- subset(mergeAll_5, subset = cell.type %in% selected_cell_types)
+DimPlot(A2N, group.by = "RV", shuffle = TRUE)
+```
+
+
+```{r}
+FeaturePlot( A2N_5,features = c("Slc1a3", "Sox11"), blend = TRUE, cols = c("lightgrey", "#ACE1AF", "#2F3826"))
+library(Seurat)
+library(ggplot2)
+
+# High-quality FeaturePlot with larger dots, saved directly
+ggsave(
+  filename = "~/Desktop/high_quality.png",
+  plot = FeaturePlot(
+    A2N_5,
+    features = c("Slc1a3", "Sox11"),
+    blend = TRUE,
+    cols = c("lightgrey", "#ACE1AF", "#2F3826"),
+    pt.size = 1.5  # increase dot size (default ~1)
+  ),
+  dpi = 600,           # very high resolution
+  width = 30,
+  height = 8,
+  units = "in",
+  type = "cairo"
+)
+
+
+
+
+```
+
+```{r}
+A2N_5 <- A2N %>%
+  DietSeurat(., assays = "RNA", layers = c("counts"))
+A2N_5 <- NormalizeData(A2N_5, assay = "RNA")
+A2N_5 <- FindVariableFeatures(A2N_5)
+A2N_5 <- ScaleData(A2N_5, features = rownames(A2N_5))
+A2N_5 <- RunPCA(A2N_5, features = VariableFeatures(A2N_5), verbose = TRUE)
+A2N_5 <- FindNeighbors(object = A2N_5, dims = 1:40) 
+A2N_5 <- FindClusters(object = A2N_5, resolution = 2)
+A2N_5 <- RunUMAP(object = A2N_5, dims = 1:30) 
+```
+
+
+```{r, fig.height = 5, fig.width = 18}
+### remove low read count clusters
+VlnPlot(A2N_5, features = c("nFeature_RNA", "nCount_RNA"), group.by = "seurat_clusters", pt.size = 0)
+A2N_5 <- subset(A2N_5, subset = seurat_clusters %in% c(12, 21), invert = TRUE)
+```
+
+### remove low count cells 
+```{r}
+A2N_5 <- subset(A2N_5, subset = seurat_clusters %in% c(12, 21), invert = TRUE)
+####remove cells that are interferring with pseudotime analysis 
+library(Seurat); library(ggplot2); library(splancs); library(dplyr)
+interactive_umap_subset <- function(seu, reduction = "umap") {
+  emb <- Embeddings(seu, reduction)
+  plot(emb[,1], emb[,2], pch = 20, col = "grey", xlab = paste0(reduction, "_1"),
+       ylab = paste0(reduction, "_2"), main = "Draw polygon to select cells")
+  coords <- locator(type = "l")
+  polygon(coords$x, coords$y, border = "red", lwd = 2)
+  inside <- inout(emb[,1:2], cbind(coords$x, coords$y))
+  seu[, inside]
+}
+# Run interactively
+A2N_5 <- interactive_umap_subset(A2N_5)
+DimPlot(A2N_5, reduction = "umap")
+
+```
+## PLot for Fig 3a 
+```{r}
+DimPlot(subset(A2N_5), group.by = "RV", pt.size = 0.5, cols = c("Control" = "black", "Ascl1WT" = "#1E90FF", "Ascl1WTBcl2" = "turquoise", "Ascl1SA6" = "#DB7093", "Ascl1SA6Bcl2" = "#9400D3")) + Blank_Theme()
+
+ggsave(
+  filename = "~/Desktop/high_quality_dimplot.png",
+  plot = DimPlot(
+    subset(A2N_5),
+    group.by = "RV",
+    pt.size = 1.5,  # larger dots
+    cols = c(
+      "Control" = "black",
+      "Ascl1WT" = "#1E90FF",
+      "Ascl1WTBcl2" = "turquoise",
+      "Ascl1SA6" = "#DB7093",
+      "Ascl1SA6Bcl2" = "#9400D3"
+    )
+  ) + Blank_Theme(),
+  dpi = 600,           # very high resolution
+  width = 12,          # adjust for figure layout
+  height = 8,
+  units = "in",
+  type = "cairo"
+)
+
+
+
+```
+
+```{r}
+FeaturePlot(
+  A2N_5,
+  features = c("Slc1a3", "Sox11"),
+  blend = TRUE,
+  cols = c("lightgrey", "#ACE1AF", "#2F3826")
+)
+```
+
+
+
+```{r}
+saveRDS(A2N_5, '/merged_5_A2N2.rds')
+```
+
+```{r install.data, eval=FALSE, include=FALSE}
+A2N_5 <- readRDS('/merged_5_A2N2.rds')
+```
+
+### Dotplot for Fig 3b
+```{r}
+A2N_5 <- JoinLayers(A2N_5)
+genes <- c("Aqp4","Aldoc","Slc1a3", 'Aldh1l1',"Sox9" ,"Gfap", "Olig1" , "Olig2","Sox2", "Hey1", "Notch1","Hes5","Sox11", "Dcx", "Tubb3", "Rbfox3","Map2", "Syt1", "Srrm4","Erbb4","Gad1", "Dlx2","Pvalb")
+genes <- unique(genes[genes != ""])
+genes <- genes[genes %in% rownames(A2N_5)]
+Idents(A2N_5) <- A2N_5$RV
+Idents(A2N_5) <- factor(Idents(A2N_5), levels = rev(levels(Idents(A2N_5))))
+DotPlot(A2N_5, features = genes, dot.scale = 4, cols = c("blue", "red")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.35, vjust = 0.5),
+        panel.grid = element_blank(), 
+        panel.background = element_blank(),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(size = 14, face = "bold")) +
+  ylab("Sample Group") + xlab("Genes")
+```
+
+
+
+
+### Dotplot for GO terms for for 3c  
+```{r}
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(tidyverse)
+library(GO.db)
+Idents(A2N_5) <- A2N_5$RV
+Idents(A2N_5) <- "RV"
+A2N_5.markers <- FindAllMarkers(A2N_5, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+A2N_5.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 20, order_by = avg_log2FC)
+A2N_5 <- ScaleData(A2N_5, features = rownames(A2N_5))
+
+neuron_go_ids <- c(
+    "GO:0042063", # gliogenesis  
+ "GO:0006631", # fatty acid metabolic process  
+  "GO:0007219", # Notch signaling pathway  
+  "GO:0006096", # glycolytic process  
+  "GO:0006119", # oxidative phosphorylation  
+  "GO:0099003", # vesicle-mediated transport in synapse  
+  "GO:0050807", # regulation of synapse organization  
+  "GO:0050770", # regulation of axonogenesis  
+   "GO:0016358", # dendrite development 
+  "GO:0050767" # regulation of neurogenesis
+ ) 
+
+go_names <- Term(GOTERM[neuron_go_ids]) |> as.character()
+names(go_names) <- neuron_go_ids
+
+gene_lists <- split(A2N_5.markers, A2N_5.markers$cluster) |>
+  map(~bitr(.$gene, "SYMBOL", "ENTREZID", org.Mm.eg.db) |> pull(ENTREZID))
+
+# Run enrichGO and filter for target GO terms
+ego <- imap(gene_lists, ~enrichGO(.x, OrgDb=org.Mm.eg.db, ont="BP", pAdjustMethod="BH", readable=TRUE) |>
+  {\(res) if (inherits(res, "enrichResult") && nrow(res) > 0)
+     as.data.frame(res) |> filter(ID %in% neuron_go_ids) |> mutate(group = .y)
+   else NULL}()) |>
+  compact() |> bind_rows() |> mutate(Description = go_names[ID])
+
+groups <- c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2")
+df <- expand.grid(Description = go_names, group = groups) |>
+  left_join(ego, by = c("Description", "group")) |>
+  replace_na(list(p.adjust = 1, Count = 0)) |>
+  mutate(
+    log_p = -log10(p.adjust),
+    Description = factor(Description, levels = go_names),
+    group = factor(group, levels = groups)
+  )
+
+ggplot(df, aes(group, fct_rev(Description), color = log_p, size = Count)) +
+  geom_point(alpha = 0.8) +
+  scale_color_gradient(low = "blue", high = "red", name = "-log10(p.adjust)") +
+  scale_size(name = "Number of Genes") +
+  labs(x = "Sample", y = "GO Term") +
+  theme_minimal(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+```
+
+```{r}
+library(ggplot2)
+library(forcats)  # for fct_rev
+
+# Your ggplot
+p <- ggplot(df, aes(group, fct_rev(Description), color = log_p, size = Count)) +
+  geom_point(alpha = 0.8) +
+  scale_color_gradient(low = "blue", high = "red", name = "-log10(p.adjust)") +
+  scale_size(name = "Number of Genes", range = c(3, 10)) +  # ensures points are visible
+  labs(x = "Sample", y = "GO Term") +
+  theme_minimal(base_size = 18) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+# ---- Save as high-quality PDF (vector) ----
+ggsave(
+  filename = "~/Desktop/GO_plot_high_quality.pdf",
+  plot = p,
+  device = cairo_pdf,  # ensures font embedding
+  width = 9,
+  height = 5,
+  units = "in"
+)
+
+# ---- Optional: Save as very high-resolution PNG (raster) ----
+ggsave(
+  filename = "~/Desktop/GO_plot_high_quality.png",
+  plot = p,
+  dpi = 600,           # very high resolution
+  width = 9,
+  height = 5,
+  units = "in",
+  type = "cairo"
+)
+```
+
+
+
+### Slingshot lineages for 5 samples Fig 3d
+```{r}
+library(slingshot)
+A2N_5 <- JoinLayers(A2N_5)
+sce <- as.SingleCellExperiment(A2N_5, assay = "RNA")
+sce_cl3 <- slingshot(sce,
+                     clusterLabels = "seurat_clusters",
+                     start.clus = c("13"), ### cluster from unbiased latent time 
+                     approx_points = 200,
+                     extend = "n",
+                     reducedDim = "UMAP")
+
+slingLineages(sce_cl3)
+
+A2N_5$Pseudotime_1 <- sce_cl3$slingPseudotime_1
+A2N_5$Pseudotime_2 <- sce_cl3$slingPseudotime_2
+A2N_5$Pseudotime_3 <- sce_cl3$slingPseudotime_3
+A2N_5$Pseudotime_4 <- sce_cl3$slingPseudotime_4
+A2N_5$Pseudotime_5 <- sce_cl3$slingPseudotime_5
+A2N_5$Pseudotime_6 <- sce_cl3$slingPseudotime_6
+A2N_5$Pseudotime_7 <- sce_cl3$slingPseudotime_7
+A2N_5$Pseudotime_8 <- sce_cl3$slingPseudotime_8
+A2N_5$Pseudotime_9 <- sce_cl3$slingPseudotime_9
+A2N_5$Pseudotime_10 <- sce_cl3$slingPseudotime_10
+
+library(ggpubr); library(viridis); library(purrr); library(stringr)
+curves <- map(1:8, ~ slingCurves(sce_cl3)[[.x]]$s[slingCurves(sce_cl3)[[.x]]$ord, ] %>%
+  as.data.frame() %>% setNames(c("umap_1", "umap_2")))
+plots <- map(1:8, ~ FeaturePlot(A2N_5, features = str_c("Pseudotime_", .x), reduction = "umap") +
+  scale_colour_viridis() + Blank_Theme() +
+  geom_path(data = curves[[.x]], aes(x = umap_1, y = umap_2)))
+ggarrange(plotlist = plots, ncol = 4, nrow = 2)
+
+A2N_5$Pseudotime_avg <- rowMeans(slingPseudotime(sce_cl3)[, c(1,2,3,4, 5, 6, 7, 8)], na.rm = TRUE)
+plot_pseudotime <- function(feature_name, curve_index) {
+  FeaturePlot(A2N_5, features = feature_name, reduction = "umap") +
+    scale_colour_viridis() + 
+    theme_void() +  # Removes background, axes, and grid
+    geom_path(data = as.data.frame(slingCurves(sce_cl3)[[curve_index]]$s[slingCurves(sce_cl3)[[curve_index]]$ord,]),
+              aes(x = umap_1, y = umap_2))
+}
+plot_pseudotime <- function(feature_name, curve_index) {
+  FeaturePlot(A2N_5, features = feature_name, reduction = "umap") +
+    scale_colour_viridis() + 
+    theme_void() +  # Removes all background, grid, axes, and text
+    theme(
+      panel.grid.major = element_blank(), 
+      panel.grid.minor = element_blank(), 
+      panel.background = element_blank()
+    ) +
+    geom_path(data = as.data.frame(slingCurves(sce_cl3)[[curve_index]]$s[slingCurves(sce_cl3)[[curve_index]]$ord,]),
+              aes(x = umap_1, y = umap_2))
+}
+
+FeaturePlot(A2N_5, features = "Pseudotime_avg", reduction = "umap") +
+  scale_colour_viridis() + theme_void() 
+```
+### Visualisation of Slingshot lineages for Fig 3d
+```{r}
+library(dplyr)
+library(ggplot2)
+library(grid)
+
+lineage_clusters <- list(
+ Lineage1 = c("13","3","1","4","2","7","5","0","6"),
+  Lineage2 = c("13","3","1","4","2","7","11"),
+  Lineage5 = c("13","3","1","15","9"),
+  Lineage6 = c("13","3","1","15","10")
+)
+
+umap_df <- as.data.frame(Embeddings(A2N_5, "umap")) %>%
+  mutate(cell = rownames(.)) %>%
+  left_join(A2N_5@meta.data %>% mutate(cell = rownames(.)) %>% dplyr::select(cell, seurat_clusters, Pseudotime_avg), by = "cell")
+
+#line_colors <- c("purple", "#DB7093", "#666666", "#353839", "#1E90FF", "turquoise", "grey", "grey")
+line_colors <- c("purple", "#DB7093", "#666666", "#353839", "#1E90FF", "turquoise", "grey", "grey")
+
+
+
+p_avg <- ggplot(umap_df, aes(umap_1, umap_2, color = Pseudotime_avg)) +
+  geom_point(size = 1) +
+  scale_color_viridis(option = "viridis", na.value = "grey") +
+  theme_void() + theme(legend.position = "right")
+
+for(i in seq_along(line_colors)) {
+  lineage_name <- paste0("Lineage", i)
+  clusters <- lineage_clusters[[lineage_name]]
+  
+  curve_df <- as.data.frame(slingCurves(sce_cl3)[[i]]$s[slingCurves(sce_cl3)[[i]]$ord, ])
+  colnames(curve_df) <- c("umap_1", "umap_2")
+  
+  # Find nearest cell clusters to curve points
+  umap_all <- Embeddings(A2N_5, "umap")
+  clusters_all <- as.character(umap_df$seurat_clusters)
+  nearest_clusters <- apply(curve_df, 1, function(pt) {
+    dists <- sqrt((umap_all[,1] - pt[1])^2 + (umap_all[,2] - pt[2])^2)
+    clusters_all[which.min(dists)]
+  })
+  
+  # Filter points to lineage clusters only
+  curve_df_filtered <- curve_df[nearest_clusters %in% clusters, ]
+  
+  p_avg <- p_avg +
+    geom_path(data = curve_df_filtered, aes(x = umap_1, y = umap_2), color = line_colors[i], size = 1, alpha = 0.8) +
+    geom_segment(data = tail(curve_df_filtered, 2),
+                 aes(x = umap_1, y = umap_2, xend = lead(umap_1), yend = lead(umap_2)),
+                 arrow = arrow(length = unit(0.25, "cm"), type = "closed"),
+                 color = "black", size = 1, na.rm = TRUE)
+}
+
+print(p_avg)
+
+ggsave(
+  filename = "~/Desktop/GO_plot_high_quality.png",
+  plot = p_avg,
+  dpi = 600,           # very high resolution
+  width = 10,
+  height = 8,
+  units = "in",
+  type = "cairo"
+)
+
+```
+
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggridges)
+library(Seurat)
+library(patchwork)
+library(scales) # for rescale()
+
+# Define genes to plot
+genes <- c("Aldh1l1", "Tubb3")
+stopifnot(all(genes %in% rownames(A2N_5)))
+
+# Add gene expression columns to meta.data
+A2N_5@meta.data[paste0(genes, "_expr")] <- lapply(genes, function(g) FetchData(A2N_5, g)[[1]])
+
+# Filter metadata for relevant cell types and remove Control
+fd <- A2N_5@meta.data %>% 
+  filter(cell.type %in% c("Cycling_Astro", "Astro-L", "Interm-1", "E-Neuronal", "Adv-Neuronal-1"),
+         RV != "Control")
+
+# Define RV colors
+RV_colors <- c(
+  "Ascl1WT" = "#1E90FF", 
+  "Ascl1WTBcl2" = "turquoise", 
+  "Ascl1SA6" = "#DB7093", 
+  "Ascl1SA6Bcl2" = "#9400D3"
+)
+
+# Dark theme for ggplot2
+dark_theme <- theme(
+  panel.background = element_rect(fill = "black", color = NA),
+  plot.background  = element_rect(fill = "black", color = NA),
+  panel.grid       = element_blank(),
+  plot.title       = element_text(color = "white", hjust = 0.5, size = 15),
+  axis.text        = element_text(color = "white"),
+  axis.title       = element_text(color = "white"),
+  legend.text      = element_text(color = "white"),
+  legend.title     = element_text(color = "white"),
+  # ✅ Add white axes
+  axis.line.x      = element_line(color = "white", size = 0.5),
+  axis.line.y      = element_line(color = "white", size = 0.5),
+  axis.ticks       = element_line(color = "white")
+)
+
+
+# Function: gene expression ridges
+plot_gene_ridges <- function(g) {
+  bw <- 0.1
+  bins <- seq(floor(min(fd$Pseudotime_avg, na.rm=TRUE)), ceiling(max(fd$Pseudotime_avg, na.rm=TRUE)), bw)
+  sm <- fd %>% 
+    mutate(bin = cut(Pseudotime_avg, bins, include.lowest = TRUE)) %>% 
+    filter(!is.na(bin)) %>%
+    group_by(RV, bin) %>%
+    summarise(avg = mean(get(paste0(g, "_expr")), na.rm = TRUE), 
+              n = n(), .groups = "drop") %>%
+    mutate(bin_start = as.numeric(sub("\\((.+),.*", "\\1", as.character(bin))),
+           bin_center = bin_start + bw / 2) %>%
+    filter(!is.na(bin_center)) %>%
+    group_by(RV) %>% 
+    mutate(norm = n / max(n)) %>% 
+    ungroup() %>%
+    group_by(RV) %>% 
+    filter(n() >= 4) %>%
+    group_modify(~ {
+      x <- seq(min(.x$bin_center), max(.x$bin_center), length.out = 300)
+      data.frame(
+        bin_center = x,
+        avg = predict(loess(avg ~ bin_center, .x, span = 0.3), x),
+        norm = predict(loess(norm ~ bin_center, .x, span = 0.3), x)
+      )
+    }) %>% ungroup()
+  
+  if (nrow(sm) == 0) return(NULL)
+  
+  sm %>%
+    mutate(RV = rep(unique(fd$RV), each = 300), 
+           y = as.numeric(factor(RV, levels = unique(fd$RV)))) %>%
+    ggplot(aes(bin_center, y, height = norm * 0.8, group = RV)) +
+    ggridges::geom_ridgeline_gradient(aes(fill = avg), scale = 1) +
+    scale_y_continuous(breaks = 1:length(unique(sm$RV)), labels = NULL, 
+                       expand = expansion(mult = c(0.02, 0.05))) +
+    labs(x = "Pseudotime", y = "Sample Density", title = g) +
+    theme_minimal(15) +
+    theme(panel.grid = element_blank(), plot.title = element_text(hjust = 0.5))
+}
+
+# Function: sample density ridge (RV)
+plot_density_ridge <- function() {
+  bw <- 0.1
+  bins <- seq(floor(min(fd$Pseudotime_avg, na.rm=TRUE)), ceiling(max(fd$Pseudotime_avg, na.rm=TRUE)), bw)
+  sm <- fd %>% 
+    mutate(bin = cut(Pseudotime_avg, bins, include.lowest = TRUE)) %>% 
+    filter(!is.na(bin)) %>%
+    group_by(RV, bin) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    mutate(bin_start = as.numeric(sub("\\((.+),.*", "\\1", as.character(bin))),
+           bin_center = bin_start + bw / 2) %>%
+    filter(!is.na(bin_center)) %>%
+    group_by(RV) %>% 
+    mutate(norm = n / max(n)) %>% 
+    ungroup() %>%
+    group_by(RV) %>% 
+    filter(n() >= 4) %>%
+    group_modify(~ {
+      x <- seq(min(.x$bin_center), max(.x$bin_center), length.out = 300)
+      data.frame(
+        bin_center = x,
+        norm = predict(loess(norm ~ bin_center, .x, span = 0.3), x)
+      )
+    }) %>% ungroup()
+  
+  if (nrow(sm) == 0) return(NULL)
+  
+  sm %>%
+    mutate(RV = rep(unique(fd$RV), each = 300), 
+           y = as.numeric(factor(RV, levels = unique(fd$RV)))) %>%
+    ggplot(aes(bin_center, y, height = norm * 0.8, group = RV, fill = RV)) +
+    ggridges::geom_ridgeline(scale = 1, color = "black", alpha = 0.9) +
+    scale_fill_manual(values = RV_colors) +
+    scale_y_continuous(breaks = 1:length(unique(sm$RV)), labels = NULL, 
+                       expand = expansion(mult = c(0.02, 0.05))) +
+    labs(x = "Pseudotime", y = NULL, title = "Sample Density") +
+    theme_minimal(15) +
+    theme(panel.grid = element_blank(), 
+          plot.title = element_text(hjust = 0.5), 
+          legend.position = "none")
+}
+
+
+
+plot_density_ridge <- function(g) {
+  p <- plot_gene_ridges(g)
+  if (!is.null(p)) {
+    p +
+      scale_fill_gradientn(
+        colors = c("darkblue", "blue", "white",  "pink", "darkred"),  # smooth gradientm "pink",
+        values = scales::rescale(c(
+          min(fd[[paste0(g, "_expr")]], na.rm = TRUE),
+          quantile(fd[[paste0(g, "_expr")]], 0.25, na.rm = TRUE),
+          median(fd[[paste0(g, "_expr")]], na.rm = TRUE),
+          quantile(fd[[paste0(g, "_expr")]], 0.75, na.rm = TRUE),
+          max(fd[[paste0(g, "_expr")]], na.rm = TRUE)
+        )),
+        name = NULL
+      )
+  } else {
+    NULL
+  }
+}
+
+
+# Combine plots: sample density + gene expression ridges
+wrap_plots(
+  c(list(plot_density_ridge()), Filter(Negate(is.null), lapply(genes, plot_gene_ridges))),
+  ncol = 3
+)
+
+```
+
+
+### Ridgeplots for Fig. 3e
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggridges)
+library(Seurat)
+library(patchwork)
+library(scales)
+
+
+genes <- c("Aldh1l1","Tubb3")
+stopifnot(all(genes %in% rownames(A2N_5)))
+A2N_5@meta.data[paste0(genes,"_expr")] <- lapply(genes, function(g) FetchData(A2N_5,g)[[1]])
+fd <- A2N_5@meta.data %>% 
+  filter(cell.type %in% c("Cycling_Astro","Astro-L","Interm-1","E-Neuronal","Adv-Neuronal-1"),RV != "Control")
+RV_colors <- c("Ascl1WT"="#1E90FF","Ascl1WTBcl2"="turquoise", "Ascl1SA6"="#DB7093","Ascl1SA6Bcl2"="#9400D3")
+fd$RV <- factor(fd$RV, levels=names(RV_colors))
+
+prepare_ridge <- function(df, value_col=NULL, binsize=0.1) {
+  if(nrow(df)==0) return(NULL)
+  bins <- seq(floor(min(df$Pseudotime_avg, na.rm=TRUE)),
+              ceiling(max(df$Pseudotime_avg, na.rm=TRUE)), binsize)
+  sm <- df %>%
+    mutate(bin=cut(Pseudotime_avg, bins, include.lowest=TRUE)) %>%
+    filter(!is.na(bin)) %>%
+    group_by(RV, bin) %>%
+    summarise(
+      avg = if(!is.null(value_col)) mean(get(value_col), na.rm=TRUE) else NA_real_,
+      n = n(), .groups="drop"
+    ) %>%
+    mutate(bin_start = as.numeric(sub("\\((.+),.*","\\1",as.character(bin))),
+           bin_center = bin_start + binsize/2) %>%
+    filter(!is.na(bin_center)) %>%
+    group_by(RV) %>%
+    mutate(norm = n/max(n)) %>%
+    ungroup() %>%
+    group_by(RV) %>%
+    group_modify(~ {
+      x <- seq(min(.x$bin_center), max(.x$bin_center), length.out=300)
+      data.frame(
+        bin_center=x,
+        avg = if(!is.null(value_col)) predict(loess(avg~bin_center,.x,span=0.3), x) else NA_real_,
+        norm = predict(loess(norm~bin_center,.x,span=0.3), x)
+      )
+    }) %>%
+    ungroup()
+  sm$RV <- rep(unique(df$RV), each=300)
+  sm$y <- as.numeric(factor(sm$RV, levels=levels(df$RV)))
+  sm
+}
+plot_gene_ridge <- function(g) {
+  sm <- prepare_ridge(fd, paste0(g,"_expr"))
+  if(is.null(sm)) return(NULL)
+  ggplot(sm, aes(bin_center, y, height=norm*0.8, group=RV)) +
+    ggridges::geom_ridgeline_gradient(aes(fill=avg), scale=1) +
+    scale_y_continuous(breaks=NULL, expand=expansion(mult=c(0.02,0.05))) +
+    labs(x="Pseudotime", y=NULL, title=g) +
+    theme_minimal(base_size=14) +
+    scale_fill_gradientn(
+      colors=c("darkblue","#4575b4","white","red","darkred"),
+      values=rescale(c(
+        min(fd[[paste0(g,"_expr")]], na.rm=TRUE),
+        quantile(fd[[paste0(g,"_expr")]],0.25, na.rm=TRUE),
+        median(fd[[paste0(g,"_expr")]], na.rm=TRUE),
+        quantile(fd[[paste0(g,"_expr")]],0.75, na.rm=TRUE),
+        max(fd[[paste0(g,"_expr")]], na.rm=TRUE)
+      ))
+    )
+}
+plot_density_ridge <- function() {
+  sm <- prepare_ridge(fd)
+  if(is.null(sm)) return(NULL)
+  ggplot(sm, aes(bin_center, y, height=norm*0.8, group=RV, fill=RV)) +
+    ggridges::geom_ridgeline(scale=1, color="black", alpha=0.9) +
+    scale_fill_manual(values=RV_colors) +
+    scale_y_continuous(breaks=NULL, expand=expansion(mult=c(0.02,0.05))) +
+    labs(x="Pseudotime", y=NULL, title="Sample Density") +
+    theme_minimal(base_size=14) +
+    theme(legend.position="none")
+}
+wrap_plots(
+  c(list(plot_density_ridge()), Filter(Negate(is.null), lapply(genes, plot_gene_ridge))),
+  ncol=3
+)
+
+```
+
+##rest of Fig3 in python 
+
+
+
+###Extended Data: Fig 7a
+```{r}
+library(patchwork)
+
+Idents(A2N_5) <- "RV"
+A2N_5_down <- subset(A2N_5, downsample=1000)
+
+RV_levels <- c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2")
+RV_colors <- c("black", "#1E90FF", "turquoise", "#DB7093", "purple")
+
+plots <- lapply(seq_along(RV_levels), function(i) {
+  DimPlot(A2N_5_down,
+          cells.highlight = colnames(A2N_5_down[, A2N_5_down$RV == RV_levels[i]]),
+          cols.highlight = RV_colors[i],
+          pt.size = 0.1) +
+    Blank_Theme() + NoLegend()
+})
+wrap_plots(plots, ncol = 5)
+
+```
+
+###Extended Data: Fig 7b
+```{r module Apical progenitors Arlotta, fig.width=5, fig.height=3}
+cd_features <- list(c("Hes1", "2810417H13Rik", "Hmgb2", "Id4", "Gas1", "Rrm2", "Vim", "Anp32b", "Ccnd2", "Sfrp1", "Hmga2", "Sox2", "Mdk", "Cdca8", "Dek", "Siva1", "Phgdh", "Cks2", "Cks1b", "Ube2c", "Birc5", "Pax6", "Cenpa", "Hes5", "Smc4", "Serpinh1", "Top2a", "Ccnb1", "Ccna2", "Nt5dc2", "Hmgn2", "Psat1", "Gmnn", "Gng5", "Dbi", "Pbk", "Tmpo", "Spc24", "Fabp7", "Tead2", "Gnai2", "Nr2e1", "Elavl1", "Alyref", "Emx2", "Tipin", "Dnajc9", "Smc2", "Cdca3", "Cdc20", "Cdca7", "Hn1l", "Ldha", "Mcm6", "Zfp36l1", "Slbp", "Mcm3", "Cdk1", "Usp1", "Srsf9", "Sox9", "Dut", "Lockd", "Mest", "Spc25", "H2afv", "Aldoc", "Cenpf", "Lig1", "Lyar", "Tyms", "Lhx2", "Nsmce4a", "Prdx1", "Creb5", "Rpa2", "Eno1", "Rgcc", "Nusap1", "Nde1", "Mcm2", "Pcna", "Rcn1", "Rfc4", "Hells", "H1fx", "Hnrnpf", "Lsm2", "H2afy", "Hspd1", "Mcm7", "Mcm5", "Anp32e", "Ccnb2", "Tcf3", "Hat1", "2700094K13Rik", "Kpna2", "Lsm5", "Grb10", "Pkm", "Paics", "Prc1", "Tk1", "Lrrn1", "Tpx2", "Lmnb1", "Dmrta2", "Ranbp1", "Hmgn3", "Rrm1", "Myl12a", "H2afz", "Nes", "Jun", "Efnb1", "Eef1d", "Cnn3", "Nudcd2", "Plagl1", "Racgap1", "Fen1", "Tpm4", "Rps27l", "Cenpm", "Ccnd1", "Ran", "Actl6a", "Dtl", "Tacc3", "Shisa2", "Tuba1b", "Ttyh1", "H2afx", "Ddx39", "Knstrn", "Rexo2", "Ung", "Slc25a5", "Dkc1", "Prdx6", "Fbxo5", "Sae1", "Mcm4", "Gli3", "H1f0", "Hnrnpu", "Smarca5", "Gsr", "E130114P18Rik", "Mt3", "Cenpw", "Dctpp1", "Ddah1", "Nasp", "Lix1", "Glo1", "Clic1", "Mt1", "Nop58", "Ak2", "Hnrnpm", "Srsf2", "Kpnb1", "Kif22", "Ezh2", "Zfp422", "Gcsh", "Qk", "Cnbp", "Rad51", "Pbdc1", "Gins2", "Cenpe", "Nap1l1", "Bola3", "Carnmt1", "Eed", "Srsf1", "Tpi1", "Srsf10", "Aurka", "Nudt5", "Nrarp", "Ccdc34", "Dhfr", "Aurkb", "Rpl22l1", "Hmgn1", "Ssrp1", "Fam162a", "Mki67", "Skp2", "Npm1", "Pea15a", "Bcl2l12", "G3bp1", "Rbbp7", "Plk1", "Uhrf1", "Hist1h4i", "Nedd4", "Nxt1", "Pfn1", "Srsf7", "Crabp2", "Set", "Rdx", "Sap30", "Snx5", "Pabpc1", "Rfc2", "Srsf6", "Fam64a", "Mrps14", "Hdgf", "Larp7", "Tfap2c", "Trim28", "Pgam1", "Ctnna1", "Fam136a", "Rfc1", "Nudt21", "Impdh2", "Rpa3", "Pole3", "Prdx4", "Pmf1", "Arl6ip6", "Sox21", "Cenpk", "Rbmxl1", "Sgol1", "Gar1", "Fignl1", "Stk39", "Rfc5", "Lsm6", "Nup37", "Ptbp1", "Pdcd4", "Zcchc3", "Fkbp3", "Fam96a", "Igf2bp2", "Plpp3", "Umps", "Asf1a", "Hdac1", "Igf2bp1", "Mrpl42", "Eif1ax", "Psip1", "Scaf11", "Mis18bp1", "Tmem165", "Hmgn5", "Pfkl", "Hsp90b1", "Nek6", "Smco4", "Mycn", "Snrnp40", "Exosc8", "Gpi1", "Cdv3", "Hnrnpd", "Lbr", "Sarnp", "Eif2s1", "Mad2l1", "Ppp4c", "Hbb-y", "Incenp", "Trip6", "Syce2", "Sox3", "Lsm3", "Fgfbp3", "Ppp1cc", "Nucks1", "Hadh", "Hey1", "Mtap", "Adk", "Exosc7", "Brix1", "Topbp1", "Hnrnpa3", "Dbf4", "Dtymk", "Etfa", "Ehbp1", "Ssbp1", "Fhl1", "Taf10", "Baz1a", "Snrpf", "Snrpa1", "D030056L22Rik", "Tox3", "Cenph", "Etf1", "Notch2", "Lpar1", "Chaf1b", "Ipo5", "Trim59", "Pnrc2", "Fam60a", "Notch1", "Gpsm2", "Pold2", "Ncl", "Plk4", "Rnaseh2c", "Asf1b", "Melk", "Higd1a", "Rpn2", "Pcbp1", "Spcs2", "Polr2m", "Emg1", "Nuf2", "E2f4", "Rsl1d1", "Mms22l", "Cenpq", "Aldoa", "Hmgb3", "2810004N23Rik", "Raly", "Gpx8", "Idh2", "Chaf1a", "Cdk2", "Ewsr1", "AI854517", "Cntnap2", "Ccne1", "Lsm14a", "Nme4", "Prim1", "Suclg2", "Pa2g4", "Wdr43", "Shmt1", "Shcbp1", "Cdk4", "Emc8", "Sfr1", "Cmc2", "Ift74", "Dnph1", "Tgif2", "Naa50", "Hmg20b", "Setd8", "Cdt1", "Gldc", "Gltp", "Gapdh", "Lrrc59", "Rpa1", "Bccip", "Cntfr", "Tmem123", "Eif3b"))
+
+ A2Ns_500_sub <- AddModuleScore(object =  A2Ns_500_sub, features = cd_features, ctrl = 5, name = 'Apical_progenitors')
+ A2Ns_500_sub <- AddModuleScore(object =  A2Ns_500_sub, features = cd_features, name = 'Apical_progenitors')
+FeaturePlot(object =  A2Ns_500_sub, features = 'Apical_progenitors1')& scale_colour_gradientn(colours = rev(brewer.pal(n = 11, name = "RdBu"))) & Blank_Theme()
+```
+```{r module Immature neurons Arlotta, fig.width=5, fig.height=3}
+data(" A2Ns_500_sub")
+cd_features <- list(c("Islr2", "Bcl11b", "Tbr1", "Rnd2", "Ina", "Bhlhe22", "Lmo1", "Cntnap2", "Neurod2", "Gap43", "Cnih2", "Cnr1", "Sh3bp1", "Bcl11a", "Tagln3", "Shb", "Dact1", "Cabp1", "Vat1", "Nell2", "Sez6", "Neurod6", "Ppp2r2b", "Tspan13", "Runx1t1", "Celf3", "Khdrbs2", "Epha5", "Tubb3", "Snca", "Mtch1", "Evl", "Wnt7b", "Map1b", "Chd3", "Crmp1", "Rtn4", "Rundc3a", "Mpc1", "Sox5", "Arpc5", "Fezf2", "Bzw2", "Syt4", "Csrp2", "Cntn2", "Nrxn1", "Mllt11", "Gdi1", "Jund", "Cacna2d1", "Ptms", "Tmeff1", "Rtn1", "Clmp", "Nfia", "Igfbpl1", "Lmo4", "Basp1", "Crip2", "Mgst3", "Hist3h2a", "Ier5", "Dpysl3", "Rab3a", "Cdk5r1", "Cotl1", "Ppp3ca", "Cmas", "Stmn2", "Tax1bp3", "Cacnb3", "Snrpn", "Kif5c", "Dab1", "Cdkn1c", "Gdpd1", "Nfib", "Map2", "Pcdh9", "Ndn", "Ank3", "Mien1", "Nipsnap3b", "Gng2", "Ttc9b", "Macrod2", "4921524J17Rik", "Zbtb18", "Pcp4", "Aplp1", "Nsg1", "Ly6h", "Stmn3"))
+
+ A2Ns_500_sub <- AddModuleScore(object =  A2Ns_500_sub, features = cd_features, ctrl = 5, name = 'Immature_neurons')
+ A2Ns_500_sub <- AddModuleScore(object =  A2Ns_500_sub, features = cd_features, name = 'Immature_neurons')
+FeaturePlot(object =  A2Ns_500_sub, features = 'Immature_neurons1')& scale_colour_gradientn(colours = rev(brewer.pal(n = 11, name = "RdBu"))) & Blank_Theme()
+```
+
+### Extended data Fig 7c
+```{r}
+library(Seurat)
+library(patchwork)
+gene_colors <- c(
+    "Top2a" = "#ACE1AF", "Pcna" = "#ACE1AF", "Mki67" = "#ACE1AF", "Slc1a3" = "#A0C0B0", "Aqp4" = "#A0C0B0", "Aldoc" = "#A0C0B0", "Aldh1l1" = "#A0C0B0", "Sox9" = "#A0C0B0", "Gfap" = "#A0C0B0", "Hey1" = "#8FBC8F", "Notch1" = "#8FBC8F", "Hes5" = "#8FBC8F", "Map2" = "#8F9D53", "Sox11" = "#8F9D53", "Tubb3" = "#8F9D53", "Srrm4" = "#006400", "Rbfox3" = "#006400", "Dcx" = "#006400", "Myt1l" = "#2F3826", "Syt1" = "#2F3826", "Gad1" = "#2F3826"
+)
+low_color <- "#F0F0F0"  
+plots <- lapply(names(gene_colors), function(gene) {
+    FeaturePlot(A2N_5, features = gene, reduction = "umap", 
+                cols = c(low_color, gene_colors[gene])) + Blank_Theme()
+})
+wrap_plots(plots, ncol = 7)
+
+DimPlot(A2N_5, group.by = 'cell.type', pt.size = 0.5, cols = c("Astro-L" = "#8FBC8F", "Interm-1" = "#8F9D53", "E-Neuronal" = "#006400", "Cycling_Astro" = "#ACE1AF", "Astrocytes" = "#A0C0B0", "Adv-Neuronal-1" = "#2F3826")) + Blank_Theme() + scale_color_manual(values = c("Astro-L" = "#8FBC8F", "Interm-1" = "#8F9D53", "E-Neuronal" = "#006400", "Cycling_Astro" = "#ACE1AF", "Astrocytes" = "#A0C0B0", "Adv-Neuronal-1" = "#2F3826"), breaks = c("Astrocytes","Cycling_Astro", "Astro-L", "Interm-1", "E-Neuronal",  "Adv-Neuronal-1"))
+```
+
+### Extended data Fig 7d
+```{r}
+Idents(A2N_5) <- "RV"
+A2N_5 <- JoinLayers(A2N_5, verbose = TRUE)
+A2N_5.markers <- FindAllMarkers(A2N_5, only.pos=TRUE, min.pct=0.25, logfc.threshold=0.25)
+top_markers <- A2N_5.markers %>%
+  group_by(cluster) %>%
+  slice_max(n=12, order_by=avg_log2FC) %>%
+  pull(gene)
+
+A2N_5 <- ScaleData(A2N_5, features=rownames(A2N_5))
+expr_mat <- GetAssayData(A2N_5, slot = "scale.data")[top_markers, ]
+meta <- A2N_5@meta.data
+meta$cell <- rownames(meta)
+df <- as.data.frame(t(expr_mat)) %>%
+  rownames_to_column(var = "cell") %>%
+  pivot_longer(cols = all_of(top_markers), names_to = "gene", values_to = "expr") %>%
+  left_join(meta[, c("cell", "RV")], by = "cell")
+
+sample_colors <- c("Control" = "black",   "Ascl1WT" = "#1E90FF",  "Ascl1WTBcl2" = "turquoise",  "Ascl1SA6" = "#DB7093",   "Ascl1SA6Bcl2" = "purple")
+df_summary <- df %>%
+  group_by(RV, gene) %>%
+  summarize(mean_expr = mean(expr), .groups = "drop")
+df_summary$RV <- factor(df_summary$RV, levels = names(sample_colors))
+df_summary$gene <- factor(df_summary$gene, levels = top_markers)
+ggplot(df_summary, aes(x = gene, y = RV, fill = mean_expr)) +
+  geom_tile() +
+  scale_fill_viridis(option = "viridis") +
+  scale_y_discrete(limits = rev(levels(df_summary$RV)), 
+                   labels = rev(names(sample_colors))) +
+  scale_x_discrete(labels = function(x) {
+    ifelse(x %in% c("Pvalb", "Dlx2"),
+           paste0("<span style='color:#8B0000; font-weight:bold;'>", x, "</span>"),
+           x)
+  }) +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_markdown(angle = 45, hjust = 1),
+        axis.title = element_blank(),
+        axis.text.y = element_text(color = rev(sample_colors[levels(df_summary$RV)]))) +
+  labs(fill = "Scaled Expr")
+```
+
+
+### Lineages in umap for Extended data Fig 7e
+```{r}
+library(dplyr)
+library(ggplot2)
+library(grid)
+
+lineage_clusters <- list(
+ Lineage1 = c("13","3","1","4","2","7","5","0","6"),
+  Lineage2 = c("13","3","1","4","2","7","11"),
+  Lineage3 = c("13","3","14","16","8","22"),
+  Lineage4 = c("13","3","14","16","19"),
+  Lineage5 = c("13","3","1","15","9"),
+  Lineage6 = c("13","3","1","15","10")
+ # Lineage7 = c("13","18","20","23"),
+ # Lineage8 = c("13","17")
+)
+
+umap_df <- as.data.frame(Embeddings(A2N_5, "umap")) %>%
+  mutate(cell = rownames(.)) %>%
+  left_join(A2N_5@meta.data %>% mutate(cell = rownames(.)) %>% dplyr::select(cell, seurat_clusters, Pseudotime_avg), by = "cell")
+
+#line_colors <- c("purple", "#DB7093", "#666666", "#353839", "#1E90FF", "turquoise", "grey", "grey")
+line_colors <- c("#D8A6C3", "#E4C3D6", "#666666", "#353839", "#A6C8FF", "#709EE4", "grey", "grey")
+
+
+p_avg <- ggplot(umap_df, aes(umap_1, umap_2, color = Pseudotime_avg)) +
+  geom_point(size = 0.5) +
+  scale_color_viridis(option = "viridis", na.value = "grey") +
+  theme_void() + theme(legend.position = "right")
+
+for(i in seq_along(line_colors)) {
+  lineage_name <- paste0("Lineage", i)
+  clusters <- lineage_clusters[[lineage_name]]
+  
+  curve_df <- as.data.frame(slingCurves(sce_cl3)[[i]]$s[slingCurves(sce_cl3)[[i]]$ord, ])
+  colnames(curve_df) <- c("umap_1", "umap_2")
+  
+  # Find nearest cell clusters to curve points
+  umap_all <- Embeddings(A2N_5, "umap")
+  clusters_all <- as.character(umap_df$seurat_clusters)
+  nearest_clusters <- apply(curve_df, 1, function(pt) {
+    dists <- sqrt((umap_all[,1] - pt[1])^2 + (umap_all[,2] - pt[2])^2)
+    clusters_all[which.min(dists)]
+  })
+  
+  # Filter points to lineage clusters only
+  curve_df_filtered <- curve_df[nearest_clusters %in% clusters, ]
+  
+  p_avg <- p_avg +
+    geom_path(data = curve_df_filtered, aes(x = umap_1, y = umap_2), color = line_colors[i], size = 1, alpha = 0.8) +
+    geom_segment(data = tail(curve_df_filtered, 2),
+                 aes(x = umap_1, y = umap_2, xend = lead(umap_1), yend = lead(umap_2)),
+                 arrow = arrow(length = unit(0.25, "cm"), type = "closed"),
+                 color = "black", size = 1, na.rm = TRUE)
+}
+
+print(p_avg)
+
+```
+### Lineages in stacked barplot for Extended data Fig 7e
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Define lineage clusters and colors, yet renamed in plot 
+lineage_clusters <- list(
+  Pseudotime_1 = c("13","3","1","4","2","7","5","0","6"),
+  Pseudotime_2 = c("13","3","1","4","2","7","11"),
+  Pseudotime_3 = c("13","3","14","16","8","22"),
+  Pseudotime_4 = c("13","3","14","16","19"),
+  Pseudotime_5 = c("13","3","1","15","9"),
+  Pseudotime_6 = c("13","3","1","15","10"),
+ # Pseudotime_7 = c("13","18","20","23"),
+ # Pseudotime_8 = c("13","17")
+)
+lineage_colors <- c(
+  Pseudotime_1="#D8A6C3", Pseudotime_2="#E4C3D6", Pseudotime_3="#666666", 
+  Pseudotime_4="#353839", Pseudotime_5="#A6C8FF", Pseudotime_6="#709EE4"
+# Pseudotime_7="grey", Pseudotime_8="grey"
+)
+sample_order <- c("Control","Ascl1WT","Ascl1WTBcl2","Ascl1SA6","Ascl1SA6Bcl2")
+lineage_order <- c("Pseudotime_3","Pseudotime_4","Pseudotime_5","Pseudotime_6","Pseudotime_2" ,"Pseudotime_1")
+
+# Define pseudotime columns dynamically
+pt_cols <- grep("^Pseudotime_", colnames(A2N_5@meta.data), value = TRUE)
+
+# Transform metadata to long format and filter by lineage clusters
+df <- A2N_5@meta.data %>%
+  dplyr::select(sample_name = Sample, cluster = seurat_clusters, all_of(pt_cols)) %>%
+  mutate(cell = rownames(.)) %>%
+  pivot_longer(cols = starts_with("Pseudotime_"), names_to = "lineage", values_to = "pseudotime") %>%
+  filter(!is.na(pseudotime)) %>%
+  filter(mapply(function(cl, lin) cl %in% lineage_clusters[[lin]], cluster, lineage)) %>%
+  group_by(cell) %>% slice_max(pseudotime, n=1, with_ties=FALSE) %>% ungroup()
+
+# Calculate percentages
+percentages <- df %>%
+  group_by(sample_name, lineage) %>%
+  summarise(n_cells = n(), .groups="drop") %>%
+  group_by(sample_name) %>%
+  mutate(percent = 100*n_cells/sum(n_cells),
+         sample_name = factor(sample_name, levels=sample_order),
+         lineage = factor(lineage, levels=lineage_order))
+
+# Plot sample x axis 
+ggplot(percentages, aes(x=sample_name, y=percent, fill=lineage)) +
+  geom_col() +
+  ylab("Percentage of cells (%)") + xlab("Sample") +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) +
+  scale_fill_manual(values=lineage_colors, name="Lineage")
+
+
+### PLot Pseudotime x axix 
+
+# Remove NAs in sample_name or lineage
+percentages_clean <- percentages %>%
+  filter(!is.na(sample_name) & !is.na(lineage))
+
+# 100% stacked bar plot
+ggplot(percentages_clean, aes(x=lineage, y=percent, fill=sample_name)) +
+  geom_col(position = "fill") +  # scales each bar to 100%
+  ylab("Percentage of cells (%)") + 
+  xlab("Lineage") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1)) +
+  scale_fill_manual(values=sample_colors, name="Sample") +
+  scale_y_continuous(labels = scales::percent_format(scale = 100))
+
+
+
+```
+
+
+### Cell cycle phases in umap and stacked barplot for Extended data Fig 8b
+```{r}
+dittoBarPlot(A2N_5,  "Phase",  group.by = "RV",   x.reorder = c(5, 3, 4, 1, 2),   var.labels.reorder = c(1, 3, 2)) +   scale_fill_manual(values = c("G1" = "#6495ED", "G2M" = "#8B0000",   "S" = "#F7C300"))
+DimPlot(A2N_5, group.by = "Phase", pt.size = 0.5, cols = c("G1" = "#6495ED", "G2M" = "#8B0000", "S" = "#F7C300")) + Blank_Theme()
+```
+##Density plots for Extended data Fig 8f
+```{r}
+plot_density(A2N_5, c("Sox10"))& Blank_Theme()
+plot_density(A2N_5, c("Pdgfra"))& Blank_Theme()
+```
+
+##.  plots for Extended data Fig 8f
+```{r}
+library(Seurat)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(scales)
+library(zoo) 
+
+A2N_5_noCtrl <- subset(A2N_5, subset = RV != "Control" & !is.na(Pseudotime_avg))
+A2N_5_noCtrl$RV <- factor(A2N_5_noCtrl$RV, 
+                          levels = c("Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2"))
+Idents(A2N_5_noCtrl) <- "RV"
+genes <- c("Myc", "Elk4", "Olig1","Olig2","Tox2", "Sox9", "Hey1", "Runx3", "Foxj1", 
+           "Sox6", "Maf", "Foxp2", "Tox", "Lmo1", "Sox8", "Nfix", "Zeb1", "Egr1", "Sp8", 
+           "Sox5", "Myt1", "Scrt2", "Nr2f1", "Arx", "Dlx1", "Meis1", "Dlx2", 
+           "Insm1", "Mafa", "Sox11", "Mef2d", "Pax5", "Ascl1", "Prox1", "Pou2f2", 
+           "Sp9", "Mafb", "Dlx6os1", "Scrt1", "Eomes", "Gsx2", "Satb1", "Lmo2", 
+           "Ebf1", "Nr2f2", "Lhx3", "Zfp536", "Foxp1", "Tcf4")
+
+expr <- GetAssayData(A2N_5_noCtrl, slot = "data")[genes, ]
+meta <- A2N_5_noCtrl@meta.data %>% mutate(cell = rownames(.))
+expr <- expr[, meta$cell]
+df <- as.data.frame(t(as.matrix(expr))) %>%
+  mutate(Pseudotime_avg = meta$Pseudotime_avg,
+         RV = meta$RV) %>%
+  pivot_longer(cols = all_of(genes), names_to = "gene", values_to = "expr") %>%
+  mutate(bin = cut(Pseudotime_avg, breaks = 50, labels = FALSE)) %>%
+  group_by(RV, bin, gene) %>%
+  summarise(mean_expr = mean(expr, na.rm = TRUE), .groups = "drop") %>%
+  complete(RV, bin = 1:50, gene, fill = list(mean_expr = 0)) %>%
+  arrange(RV, gene, bin) %>%
+  group_by(RV, gene) %>%
+  mutate(
+    smooth_expr = zoo::rollmean(mean_expr, k = 3, fill = NA, align = "center"),
+    smooth_expr = ifelse(is.na(smooth_expr), mean_expr, smooth_expr)
+  ) %>%
+  ungroup() %>%
+  group_by(gene) %>%   # scale per gene across ALL RVs
+  mutate(
+    scaled_expr = scales::rescale(smooth_expr)
+  ) %>%
+  ungroup()
+gene_order <- df %>%
+  group_by(gene) %>%
+  summarise(center = weighted.mean(as.numeric(bin), scaled_expr, na.rm = TRUE)) %>%
+  arrange(center) %>%
+  pull(gene)
+
+df$gene <- factor(df$gene, levels = rev(gene_order))
+ggplot(df, aes(x = as.numeric(bin), y = gene, fill = scaled_expr)) +
+  geom_tile(width = 1, height = 1) +
+  facet_wrap(~RV, nrow = 1) +
+  scale_fill_viridis_c(option = "magma") +
+  labs(x = "Pseudotime (binned)", y = NULL, fill = "Scaled expr") +
+  theme_minimal(base_size = 10) +
+  theme(strip.text = element_text(size = 12, face = "bold"),
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_blank(),
+        panel.spacing = unit(1, "lines"),
+        axis.ticks = element_blank()) 
+```
+
+
+

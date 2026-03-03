@@ -1,0 +1,450 @@
+---
+title: 'BC021: Deconstructing in vivo glia-to-neuron conversion in the postnatal mouse cortex.'
+subtitle: '2: Retroviral transcript annotation of samples and sampling'
+date: last-modified
+author: 
+    - name : Karla Lozano Gonzalez
+      email : karla.lozano_gonzalez@kcl.ac.uk
+      orcid : 0000-0003-0329-4668
+      affiliation: CDN Bioinformatics Core
+      affiliation-url: https://emckclac.sharepoint.com/sites/IoPPNcdnb/SitePages/Bioinformatics.aspx
+    - name : Fursham Hamid
+      email : fursham.hamid@kcl.ac.uk
+      url : https://twitter.com/FurshamH
+      orcid : 0000-0002-6846-7382
+      affiliation: CDN Bioinformatics Core
+      affiliation-url: https://devneuro.org/cdn/index.php
+    
+format:
+    html:
+        page-layout: full
+        theme: pulse
+        highlight: espresso
+        css: /home/cdn-bc/Github_repo/fuRsh/inst/resources/styles.css
+        smooth-scroll: true
+        self-contained: true
+        toc-depth: 3
+        toc: true
+        toc-location: right
+        toc-title: Contents
+        code-fold: false
+        df-print: paged
+        grid:
+            sidebar-width: 150px
+            body-width: 950px
+            margin-width: 150px
+            gutter-width: 1em
+fig-cap-location: margin
+tbl-cap-location: margin
+fig-align: center
+title-block-banner: /home/cdn-bc/Github_repo/fuRsh/man/figures/banner.jpg
+title-blocks-style: plain
+filters:
+   - /home/cdn-bc/Github_repo/fuRsh/inst/resources/include-code-files.lua
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+```{r}
+#| label: reportsetup
+#| include: false
+knitr::opts_chunk$set(echo = T, include = T,
+                      fig.width = 8, fig.height = 6,
+                      fig.align = 'center',
+                      warning = F, message = F,
+                      eval=T) 
+```
+
+
+The space below contain the codes used in this analysis for the purposes of
+transparency and reproducibility:
+
+<!-- Describe methodology -->
+
+## Load dependencies
+The code below loads all dependencies to run the script.
+```{r}
+#| label: load_dependencies
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+suppressPackageStartupMessages({
+    library(tidyverse)
+    library(Seurat)
+    library(ggplot2)
+    library(patchwork)
+})
+```
+
+```{r}
+#| label: read_obj
+#| eval: true
+#| include: false
+#| classes: styled-output
+
+seuratlist.2wpi.filt <- readRDS("/Users/alexiscooper/The Francis Crick Dropbox/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/2-4wpi/preprocessing_2_4wpi_Nuclei_LogNorm/output/seuratlist_2and4wpi_LogNorm_filtered.rds")
+```
+
+
+## Annotation of reporter genes
+
+We observe the expression of reporter genes per sample
+```{r}
+#| label: reporter_genes_exp
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Plot expression of reporter genes
+genes_of_interest <- c("Mscarlet3LTR", "GFPU3")
+
+lapply(seuratlist.2wpi.filt, function(sample){
+  FeaturePlot(sample, features = genes_of_interest, reduction = "pca")
+})
+```
+
+We proceed to annotate cells per sample according to the expression of 
+reporter genes.
+
+```{r}
+lapply(seuratlist.2wpi.filt, function(x) {
+  colnames(x@meta.data)
+})
+```
+
+```{r}
+#| label: reporter_genes_anno
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Annotate each sample based on expression of reporter genes
+seuratlist.2wpi.filt <- lapply(seuratlist.2wpi.filt, function(sample) {
+  for (gene in genes_of_interest) {
+    if (gene %in% rownames(sample)) {
+      sample@meta.data[[paste0(gene, ".pos")]] <- ifelse(
+        FetchData(object = sample, vars = c(gene), layer = "counts") > 0, "Pos", "Neg"
+      )
+    } 
+  }
+  return(sample)
+})
+
+#Saving sample names
+names.seuratlist.2wpi.filt <- names(seuratlist.2wpi.filt)
+
+# Annotate filtering based on expression of reporter genes
+seuratlist.2wpi.filt <- lapply(names(seuratlist.2wpi.filt), function(sample_name) {
+  seurat_object <- seuratlist.2wpi.filt[[sample_name]]
+
+  # Add the new column based on conditions using if-else
+  if (sample_name == "Control") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos"
+  } else if (sample_name == "Ascl1WT") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos" 
+  } else if (sample_name == "Ascl1WTBcl2") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos" 
+  } else if (sample_name == "Ascl1SA6") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos" 
+  } else if (sample_name == "Ascl1SA6Bcl2") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos" 
+  } else if (sample_name == "Bcl2") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Neg" & seurat_object@meta.data$GFPU3 == "Pos"
+  } else if (sample_name == "Ascl1SA6Dlx2") {
+    seurat_object@meta.data$transcript.filtering.keep <-  seurat_object@meta.data$Mscarlet3LTR.pos == "Pos"
+  } else if (sample_name == "Ascl1SA6Dlx2_2") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos"
+  } else if (sample_name == "Ascl1WTSA6") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos"
+  } else if (sample_name == "Ascl1WTDlx2") {
+    seurat_object@meta.data$transcript.filtering.keep <-  seurat_object@meta.data$Mscarlet3LTR.pos == "Pos" 
+  } else if (sample_name == "Ascl1SA6Bcl2_mat") {
+    seurat_object@meta.data$transcript.filtering.keep <-  seurat_object@meta.data$Mscarlet3LTR.pos == "Pos"
+  }else if (sample_name == "Ascl1SA6Dlx2_mat") {
+    seurat_object@meta.data$transcript.filtering.keep <-  seurat_object@meta.data$Mscarlet3LTR.pos == "Pos"
+  }
+  return(seurat_object)
+})
+
+# Renaming list 
+names(seuratlist.2wpi.filt) <- names.seuratlist.2wpi.filt
+```
+
+This table reports the number of cells annotated according to the expression
+of reporter genes/combination of genes.
+```{r}
+#| label: reporter_genes_tally
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+## Number of cells per sample after filtering and annotated based on reporter genes
+cell.tally <- do.call(rbind,lapply(seuratlist.2wpi.filt, function(sample){
+  tibble(samples = unique(sample$orig.ident),
+    total = nrow(sample@meta.data),
+       transcript.keep = nrow(filter(sample@meta.data, transcript.filtering.keep == TRUE)))
+}))
+
+cell.tally
+```
+
+
+The following plots show sparse to no expression of expected reporter genes in 
+cells for certain samples.
+
+```{r}
+#| label: reporter_genes_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+#| fig-width: 20
+#| fig.height: 10
+
+# Plotting annotation
+do.call(wrap_plots,lapply(seuratlist.2wpi.filt, function(sample){
+  DimPlot(sample, group.by = "transcript.filtering.keep", reduction = "pca")  +
+        labs(title = sample$orig.ident[1])
+}))
+```
+
+In the interest of retaining cells affected by this, we implemented a method
+that considers the clustering of cells and how far away each cell is from the 
+centroid (Mahalanobis distance) to determine outliers. Additionally, 
+those cells that express the expected combination of reporter genes (true cells)
+are retained as well.
+
+```{r}
+#| label: Clustering
+#| eval: false
+#| include: true
+#| classes: styled-output
+ 
+# Clustering of at low resolution for further filtering
+seuratlist.2wpi.filt <- lapply(seuratlist.2wpi.filt, function(sample){
+	sample <- FindNeighbors(sample, dims = 1:50)
+  sample <- FindClusters(sample, resolution = 0.1)
+  sample
+})
+```
+
+```{r}
+#| label: Clustering_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+#| fig-width: 20
+#| fig.height: 10
+
+# Plotting clusters
+do.call(wrap_plots,lapply(seuratlist.2wpi.filt, function(sample){
+  DimPlot(sample, reduction = "pca") +
+        labs(title = sample$orig.ident[1])
+}))
+```
+
+```{r}
+#| label: Clustering_tally
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+## Number of cells per cluster per sample after filtering and annotated based on reporter genes
+cluster.tally <- do.call(rbind,lapply(seuratlist.2wpi.filt, function(sample){
+  sample@meta.data %>% 
+    group_by(seurat_clusters,transcript.filtering.keep) %>% 
+    tally() %>% 
+    mutate(samples = unique(sample$orig.ident)) %>% 
+    relocate(samples, .before = seurat_clusters)
+}))
+
+cluster.tally
+```
+
+```{r}
+#| label: outlier_anno
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+## Annotating outliers for each cluster
+seuratlist.2wpi.filt <- lapply(seuratlist.2wpi.filt, function(sample){
+  
+  # Number of principal components to use
+  PC <- 10
+  
+  #Extract PCA embeddings
+  pca_df <- as.data.frame(Embeddings(sample, reduction = "pca"))[,1:PC]
+  
+  # Add cluster annotations
+  pca_df$cluster <- sample$seurat_clusters
+  pca_df$keep.anno <- sample$transcript.filtering.keep
+  
+  # Calculate Mahalanobis distance per cluster using lapply
+  results <- do.call(rbind, lapply(unique(pca_df$cluster), function(cl) {
+    
+    # Subset data for the cluster
+    cluster_data <- pca_df %>% filter(cluster == cl)
+    
+    # Calculate mean and covariance using only TRUE cells
+    dat.center <- colMeans(cluster_data[, 1:PC])
+    dat.cov <- cov(cluster_data[, 1:PC])
+    
+    # Compute Mahalanobis distance
+    cluster_data$mdist <- mahalanobis(
+      x = cluster_data[, 1:PC],
+      center = dat.center,
+      cov = dat.cov
+    )
+    
+    # Calculate cut-off with Chi-squared (90% confidence)
+    cutoff <- qchisq(p = 0.90, df = PC)  
+    
+    # Add outliers based on Mahalanobis distance
+    cluster_data <- cluster_data %>%
+      mutate(Outlier = ifelse(mdist > cutoff, "Yes", "No"))
+    
+    # Return cluster results as a list
+    return(cluster_data)
+  }))
+  
+  # Keep all true cells based on reporter genes
+  results <- results %>% 
+    mutate(Outlier = ifelse(Outlier == "Yes" & keep.anno == TRUE, "No",Outlier)) %>% 
+    rownames_to_column("cell") %>% 
+    select(c("cell","Outlier", "mdist"))
+
+  # Append annotation to meta data
+  sample@meta.data <- sample@meta.data %>% 
+     rownames_to_column("cell") %>% 
+     left_join(results, by = join_by("cell")) %>% 
+      column_to_rownames("cell")
+   
+  return(sample)
+})
+```
+
+The following plots show the cells annotated as outliers and the percent of cell 
+that would be retained after filtering out said outliers.
+```{r}
+#| label: Outlier_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Plot distribution of outliers
+lapply(seuratlist.2wpi.filt, function(sample){
+  
+  # Calculate number of outliers per sample
+  outlier_table <- table(sample$Outlier)
+
+  # Calculate the percentage of retained cells 
+  percentage <- (outlier_table["No"] / sum(outlier_table)) * 100
+  
+  # Plot outlier cells per cluster in PCA
+  DimPlot(sample, reduction = "pca", group.by = "seurat_clusters", split.by = "Outlier", shuffle = T) +
+    labs(title = unique(sample$orig.ident),
+         subtitle = paste("% retained -", round(percentage,digits = 2)),
+         x = "PC1", y = "PC2")
+})
+```
+
+These are the final number of cells retained
+```{r}
+#| label: Outlier_tally
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+## Number of cells per sample after filtering for outliers
+Non_outlier.tally <- do.call(rbind,lapply(seuratlist.2wpi.filt, function(sample){
+  sample@meta.data %>% 
+    group_by(Outlier) %>% 
+    tally() %>% 
+    mutate(samples = unique(sample$orig.ident)) %>% 
+    filter(Outlier == "No") %>% 
+    relocate(samples, .before = Outlier)
+}))
+
+Non_outlier.tally
+```
+
+
+```{r}
+#| label: Outlier_filter
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+## Filtering data to remove outliers
+seuratlist.2wpi.filtered <- lapply(seuratlist.2wpi.filt, function(sample) {
+    sample.id <- sample$orig.ident[1]
+    subset(sample, 
+           subset = Outlier == "No")
+})
+```
+
+## Dimensional reduction of filtered data
+
+Performing Normalization and dimensional reduction via pca for each sample
+```{r}
+#| label: dim_red_pca
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Increasing maximum size allowed for Global size  
+options(future.globals.maxSize = 8000 * 1024^2)
+
+## Run LogNorm, FindVariableFeatures and Scale on filtered samples
+seuratlist.2wpi.filtered <- lapply(seuratlist.2wpi.filtered, function(sample){
+  sample <- FindVariableFeatures(sample, selection.method = "vst", nfeatures = 2000)
+  sample <- ScaleData(sample, features = rownames(sample))
+})
+
+## Perform dimensional reduction
+seuratlist.2wpi.filtered <- lapply(seuratlist.2wpi.filtered, function(sample){
+	sample <- RunPCA(sample)
+  sample 
+})
+```
+
+
+```{r}
+
+###make sure all samples dont have more than 1% mito
+# Filter out cells with more than 1% mitochondrial genes
+seuratlist.2wpi.filtered <- lapply(seuratlist.2wpi.filtered, function(sample) {
+  # Filter cells based on mitochondrial percentage
+  sample <- subset(sample, subset = percent.mt < 1)
+  return(sample)
+})
+
+```
+
+
+```{r}
+#| label: saveRDS
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Save filtered object
+saveRDS(seuratlist.2wpi.filtered, "/Users/alexiscooper/The Francis Crick Dropbox/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/2-4wpi/preprocessing_2_4wpi_Nuclei_LogNorm/output/seuratlist_2wpi_LogNorm_filt_reporter_genes.rds")
+```
+
+```{r}
+seuratlist.2wpi.filtered <- readRDS("/Users/alexiscooper/The Francis Crick Dropbox/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/2-4wpi/preprocessing_2_4wpi_Nuclei_LogNorm/output/seuratlist_2wpi_LogNorm_filt_reporter_genes.rds")
+```
+
+```{r}
+#| label: session_info
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Tools' versions used during this analysis
+sessionInfo()
+```
+

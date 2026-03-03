@@ -1,0 +1,1043 @@
+---
+title: "CGE figure"
+output: html_document
+date: "2026-02-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+suppressPackageStartupMessages({
+library(clusterProfiler)
+library(cowplot)
+library(dittoSeq)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(gridExtra)
+library(magrittr)
+library(Nebulosa)
+library(org.Mm.eg.db)
+library(patchwork)
+library(pheatmap)
+library(purrr)
+library(qs)
+library(RColorBrewer)
+library(scCustomize)
+library(Seurat)
+library(SeuratData)
+library(SeuratDisk)
+library(tibble)
+library(tidyr)
+library(tidyverse)
+library(viridis)
+library(ComplexHeatmap)
+})
+```
+
+
+## STEP 1 ##Figure 7b/c and Figure S14 b
+```{r}
+# -------------------------------
+# Subset only P28 interneurons
+# -------------------------------
+Neurons_P28 <- subset(Neurons, subset = grepl("P28$", sample) & !is.na(sample))
+Idents(Neurons_P28) <- "sample"
+
+# -------------------------------
+# Define MGE and CGE cell groups
+# -------------------------------
+MGE <- WhichCells(Neurons_P28, idents = c("Pvalb_P28", "Sst_P28"))
+CGE <- WhichCells(Neurons_P28, idents = c("Vip_P28", "Lamp5_P28"))
+
+# -------------------------------
+# Create a new metadata column for MGE/CGE identity
+# -------------------------------
+Neurons_P28$MGE_CGE <- NA
+Neurons_P28$MGE_CGE[MGE] <- "MGE"
+Neurons_P28$MGE_CGE[CGE] <- "CGE"
+
+# -------------------------------
+# Set new identities
+# -------------------------------
+Idents(Neurons_P28) <- "MGE_CGE"
+
+# -------------------------------
+# Find DEGs between MGE and CGE interneurons
+# -------------------------------
+MGE_vs_CGE_DEG <- FindMarkers(
+  Neurons_P28,
+  ident.1 = "MGE",
+  ident.2 = "CGE",
+  logfc.threshold = 0.25,
+  min.pct = 0.25
+)
+
+# Add direction of upregulation
+MGE_vs_CGE_DEG$up_in <- ifelse(MGE_vs_CGE_DEG$avg_log2FC > 0, "Up_in_MGE", "Up_in_CGE")
+list_TFs <- read.csv(  "/Users/alexiscooper/Library/CloudStorage/Dropbox-TheFrancisCrick/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/MGE:CGE/list_TFs.csv", header = TRUE, stringsAsFactors = FALSE)
+
+
+### extract TF from list 
+MGE_vs_CGE_TFs <- MGE_vs_CGE_DEG[rownames(MGE_vs_CGE_DEG) %in% list_TFs$TFs,]
+
+Neurons <- AddModuleScore(Neurons, features = rownames(MGE_vs_CGE_TFs)[MGE_vs_CGE_TFs$up_in == "Up_in_CGE"], ctrl = 15, name = "CGE")
+Neurons <- AddModuleScore(Neurons, features = rownames(MGE_vs_CGE_TFs)[MGE_vs_CGE_TFs$up_in == "Up_in_MGE"], ctrl = 15, name = "MGE")
+Neurons <- subset(Neurons, subset = !is.na(sample))
+
+# Define color palette (same as your existing scheme)
+colors <- c(
+  "Ascl1SA6Bcl2_2wpi" = "#9400D3",
+  "Ascl1SA6Bcl2_4wpi" = "#6A5ACD",
+  "Ascl1SA6Dlx2_2wpi" = "#32CD32",
+  "Ascl1SA6Dlx2_4wpi" = "#00FA9A",
+  "Pvalb_P10" = "#DFA9A9",
+  "Pvalb_P28" = "#A88BB3",
+  "Sst_P10" = "#D9D3A0",
+  "Sst_P28" = "#C9B08A",
+  "Vip_P10" = "#9BB199",
+  "Vip_P28" = "#D0F0C0",
+  "Lamp5_P10" = "#ADD8E6",
+  "Lamp5_P28" = "#8BAAC0"
+)
+
+Idents(Neurons) <- "sample"
+
+# Define a reusable boxplot function
+bp <- function(f) {
+  SCpubr::do_BoxPlot(Neurons, feature = f, split.by = "sample") +
+    scale_fill_manual(values = colors) +
+   # coord_cartesian(ylim = c(-0.5, 1.5)) +
+    ggtitle(f)
+}
+
+# 📊 Plot CGE and MGE module scores side by side
+bp("CGE1") | bp("MGE1")
+
+rownames(MGE_vs_CGE_TFs)[MGE_vs_CGE_TFs$up_in == "Up_in_CGE"]
+rownames(MGE_vs_CGE_TFs)[MGE_vs_CGE_TFs$up_in == "Up_in_MGE"]
+```
+
+####STEP 2
+```{r}
+library(Seurat)
+library(SCpubr)
+library(RColorBrewer)
+library(dplyr)
+library(patchwork)
+
+# ====== Subset relevant samples ======
+plot_samples <- c( "Pvalb_P28", "Sst_P28", "Vip_P28", "Lamp5_P28",   "Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_4wpi")
+Neurons_subset <- subset(Neurons, subset = sample %in% plot_samples)
+colors <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD", "Ascl1SA6Dlx2_4wpi"="#00FA9A", "Pvalb_P28"="#666666", "Sst_P28"="#9C9C9C", "Vip_P28"="#D7D7D7", "Lamp5_P28"="#E6E6E6")
+bp <- function(f) SCpubr::do_BoxPlot(Neurons_subset, feature = f, split.by = "sample") +
+  scale_fill_manual(values = colors) +
+  coord_cartesian(ylim = c(-2, 3)) +
+  ggtitle(f)
+
+# ====== Plot MGE, CGE, and combined (MGE − CGE) scores ======
+Neurons_subset$CGE_minus_MGE <- Neurons_subset$CGE1 - Neurons_subset$MGE1
+
+ bp("CGE1") | bp("MGE1") | bp("CGE_minus_MGE")
+
+```
+
+
+### this for FIgure pooling CGE and MGE!!!! STEP 3
+```{r}
+# ====== Pooled groups and subset ======
+Neurons_subset$pooled_group <- ifelse(Neurons_subset$sample %in% c("Pvalb_P28","Sst_P28"), "MGE",
+                              ifelse(Neurons_subset$sample %in% c("Vip_P28","Lamp5_P28"), "CGE",
+                              Neurons_subset$sample))
+Neurons_subset <- subset(Neurons_subset, subset = pooled_group %in% c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi","CGE","MGE"))
+Neurons_subset$pooled_group <- factor(Neurons_subset$pooled_group, levels = c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi","CGE","MGE"))
+Idents(Neurons_subset) <- "pooled_group"
+
+# ====== Colors ======
+colors_pooled <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A","CGE"="#5F5F5F","MGE"="#BDBDBD")
+
+# ====== Boxplot function ======
+
+bp <- function(f) SCpubr::do_BoxPlot(Neurons_subset, feature=f) + scale_fill_manual(values=colors_pooled) + coord_cartesian(ylim=c(-2,3)) + ggtitle(f) + theme(text=element_text(size=16))
+
+
+# ====== Combined score ======
+Neurons_subset$CGE_minus_MGE <- Neurons_subset$CGE1 - Neurons_subset$MGE1
+
+# ====== Plot ======
+bp("CGE1") | bp("MGE1")
+
+```
+
+### 4 rank TF avg_log2FC ensures TFs are truly enriched.
+
+#(pct.1 - pct.2) rewards TFs that are highly expressed in your group and minimally in the other.
+
+# Sorting by this score gives you robust and specific TFs first, which is exactly what you want for CGE vs MGE.
+```{r}
+MGE_vs_CGE_TFs$score <- MGE_vs_CGE_TFs$avg_log2FC * (MGE_vs_CGE_TFs$pct.1 - MGE_vs_CGE_TFs$pct.2)
+
+# CGE-specific TFs
+CGE_TFs <- MGE_vs_CGE_TFs %>%
+  filter(up_in=="Up_in_CGE") %>%
+  arrange(desc(score))
+
+cat("Number of CGE TFs:", nrow(CGE_TFs), "\n")
+print(rownames(CGE_TFs))
+
+# MGE-specific TFs
+MGE_TFs <- MGE_vs_CGE_TFs %>%
+  filter(up_in=="Up_in_MGE") %>%
+  arrange(desc(score))
+
+cat("Number of MGE TFs:", nrow(MGE_TFs), "\n")
+print(rownames(MGE_TFs))
+
+```
+
+## STEP 5 last step for plotting 
+```{r}
+library(Seurat); library(SCpubr); library(dplyr)
+
+# ---- Top 10 CGE then MGE TFs ----
+top10_TFs <- intersect(c(head(rownames(CGE_TFs),10), head(rownames(MGE_TFs),10)), rownames(Neurons_subset))
+
+# ---- Stacked violin plot ----
+VlnPlot(Neurons_subset, features=top10_TFs, group.by="pooled_group", fill.by="ident",
+        stack=TRUE, flip=TRUE, pt.size=0, cols=c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A","CGE"="#5F5F5F","MGE"="#BDBDBD")) +
+  NoLegend() + ggtitle("Top 10 TFs per Group (CGE → MGE)") + ylab("Gene Name") +
+  theme(panel.grid=element_blank(), panel.border=element_rect(color="black", fill=NA), text=element_text(size=14))
+
+# ---- Top 10 TFs per group ----
+top10_CGE <- intersect(head(rownames(CGE_TFs),10), rownames(Neurons_subset))
+top10_MGE <- intersect(head(rownames(MGE_TFs),10), rownames(Neurons_subset))
+cols <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A","CGE"="#5F5F5F","MGE"="#BDBDBD")
+
+# ---- Create individual plots ----
+p_CGE <- VlnPlot(Neurons_subset, features=top10_CGE, group.by="pooled_group", fill.by="ident",
+                 stack=TRUE, flip=TRUE, pt.size=0, cols=cols) +
+  NoLegend() + ggtitle("Top 10 CGE TFs") + ylab("Gene Name") +
+  theme(panel.grid=element_blank(), panel.border=element_rect(color="black", fill=NA), text=element_text(size=14))
+
+p_MGE <- VlnPlot(Neurons_subset, features=top10_MGE, group.by="pooled_group", fill.by="ident",
+                 stack=TRUE, flip=TRUE, pt.size=0, cols=cols) +
+  NoLegend() + ggtitle("Top 10 MGE TFs") + ylab("Gene Name") +
+  theme(panel.grid=element_blank(), panel.border=element_rect(color="black", fill=NA), text=element_text(size=14))
+
+# ---- Combine side by side ----
+p_CGE | p_MGE
+
+```
+
+
+### NOw for Seperate TFs 
+
+## this works STEP 1
+```{r}
+library(Seurat); library(SCpubr); library(dplyr); library(patchwork)
+
+# ---- P28 DEGs ----
+Neurons_P28 <- subset(Neurons, grepl("P28$", sample)); Idents(Neurons_P28) <- "sample"
+
+library(MAST)
+
+DEG_P28 <- FindAllMarkers(interneuron_cells, test.use="MAST", logfc.threshold=0.25, min.pct=0.25, only.pos=TRUE)
+#DEG_P28 <- FindAllMarkers(Neurons_P28, logfc.threshold=.25, min.pct=.25, only.pos=TRUE)
+
+# ---- TF filter ----
+list_TFs <- read.csv("/Users/alexiscooper/Library/CloudStorage/Dropbox-TheFrancisCrick/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/MGE:CGE/list_TFs.csv")
+DEG_TFs <- DEG_P28[DEG_P28$gene %in% list_TFs$TFs, ]
+
+# ---- Robust TF selection per subtype ----
+subtypes <- c("Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+top_TFs <- do.call(rbind, lapply(subtypes, function(cl){
+  tmp <- DEG_TFs[DEG_TFs$cluster==cl & DEG_TFs$pct.1>=.35 & DEG_TFs$pct.2<=.6 & DEG_TFs$avg_log2FC>=.3, ]
+  if(nrow(tmp)==0) return(NULL)
+  tmp$score <- tmp$avg_log2FC * (tmp$pct.1 - tmp$pct.2)
+  tmp[order(-tmp$score), ]
+}))
+
+# ---- Module scores (SAFE) ----
+DefaultAssay(Neurons) <- "RNA"; genes <- rownames(Neurons)
+for(cl in subtypes){
+  g <- intersect(top_TFs$gene[top_TFs$cluster==cl], genes)
+  if(length(g)>=3) Neurons <- AddModuleScore(Neurons, list(g), ctrl=15, name=paste0(cl,"_TF"))
+}
+
+# ---- Plot subset ----
+samples_levels <- c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi","Vip_P28","Lamp5_P28","Pvalb_P28","Sst_P28")
+colors <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A",
+            "Vip_P28"="#5F5F5F","Lamp5_P28"="#4D4D4D","Pvalb_P28"="#BDBDBD","Sst_P28"="#9E9E9E")
+
+Neurons_plot <- subset(Neurons, sample %in% samples_levels)
+Neurons_plot$sample <- factor(Neurons_plot$sample, levels=samples_levels)
+Idents(Neurons_plot) <- "sample"
+bp <- function(f) SCpubr::do_BoxPlot(Neurons_plot, feature=f, split.by="sample") +
+  scale_fill_manual(values=colors) + coord_cartesian(ylim=c(-1,1)) + ggtitle(f)
+# ---- Plots ----
+bp("Lamp5_P28_TF1") | bp("Vip_P28_TF1") | bp("Sst_P28_TF1") | bp("Pvalb_P28_TF1")
+# ---- Inspect TFs ----
+lapply(subtypes, function(cl) top_TFs$gene[top_TFs$cluster==cl])
+
+```
+
+```{r}
+# ---- Sample order and colors ----
+samples_levels <- c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi","Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+my_colors <- c(
+  "Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A",
+  "Lamp5_P28"="#4D4D4D","Vip_P28"="#5F5F5F","Sst_P28"="#9E9E9E","Pvalb_P28"="#BDBDBD"
+)
+Neurons_plot$sample <- factor(Neurons_plot$sample, levels=samples_levels)
+Idents(Neurons_plot) <- "sample"
+
+# ---- Top 5 TFs per subtype from top_TFs ----
+top5_TFs <- unlist(lapply(subtypes, function(cl){
+  tfs <- top_TFs[top_TFs$cluster==cl, ]
+  head(intersect(tfs$gene[order(-tfs$avg_log2FC)], rownames(Neurons_plot)), 5)
+}))
+
+# ---- Stacked violin plot ----
+VlnPlot(Neurons_plot, features=top5_TFs, group.by="sample", fill.by="ident",
+        stack=TRUE, flip=TRUE, pt.size=0, cols=my_colors) +
+  NoLegend() + ggtitle("Top 5 TFs per Subtype") +
+  ylab("Gene Name") +
+  theme(panel.grid=element_blank(), panel.border=element_rect(color="black", fill=NA))
+
+```
+
+
+
+```{r}
+library(Seurat); library(SCpubr); library(patchwork)
+
+# ---- Colors & plotting order ----
+colors <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A","Lamp5_P28"="#4D4D4D","Vip_P28"="#5F5F5F","Sst_P28"="#9E9E9E","Pvalb_P28"="#BDBDBD")
+samples_levels <- names(colors)
+subtypes <- c("Lamp5_P28","Vip_P28","Pvalb_P28", "Sst_P28"); ascl1_samples <- samples_levels[1:4]
+
+Merged_Neurons <- subset(Neurons, subset = sample %in% c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi","Lamp5_P28","Vip_P28","Pvalb_P28", "Sst_P28"))
+
+Merged_Neurons$sample <- factor(Merged_Neurons$sample, levels=samples_levels); Idents(Merged_Neurons) <- "sample"
+Merged_Neurons[["RNA"]] <- JoinLayers(Merged_Neurons[["RNA"]])
+
+P28_Neurons <- subset(Neurons, subset = sample %in% c("Lamp5_P28","Vip_P28","Pvalb_P28", "Sst_P28"))
+
+library(MAST)
+
+DEG_P28_Neurons <- FindAllMarkers(P28_Neurons, test.use="MAST",
+                           logfc.threshold=0.25, min.pct=0.25, only.pos=TRUE)
+# ---- Load TF list ----
+list_TFs <- read.csv("/Users/alexiscooper/Library/CloudStorage/Dropbox-TheFrancisCrick/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/MGE:CGE/list_TFs.csv",
+                     header=TRUE, stringsAsFactors=FALSE)
+
+# ---- Keep only TF DEGs ----
+DEG_P28_Neurons_TFs <- DEG_P28_Neurons[DEG_P28_Neurons$gene %in% list_TFs$TFs, ]
+
+# ---- Step 1: Filter TFs per subtype (expression ≥20%, optional fold-change >0) ----
+subtypes <- c("Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")  # exact names
+
+top_TFs_list <- lapply(subtypes, function(cl) {
+  tmp <- DEG_P28_Neurons_TFs[
+    DEG_P28_Neurons_TFs$cluster == cl &
+    DEG_P28_Neurons_TFs$pct.1 >= 0.35 &
+    DEG_P28_Neurons_TFs$pct.2 <= 0.6 &
+    DEG_P28_Neurons_TFs$avg_log2FC >= 0.3, 
+  ]
+  if(nrow(tmp) == 0) return(NULL)
+  tmp$enrichment <- tmp$pct.1 / tmp$pct.2
+  tmp[order(-tmp$enrichment, -tmp$avg_log2FC), ]
+})
+
+top_TFs <- do.call(rbind, top_TFs_list)
+
+
+
+ # top 10 by score → you’re computing a combined score of fold-change × fraction of expressing cells. This sorts TFs from highest to lowest “score” and picks the top 10. But it does not remove TFs below a certain fold-change — a TF with a low avg_log2FC but high pct.1 could still appear.
+
+
+# ---- Add module scores to Merged_Neurons ----
+DefaultAssay(Merged_Neurons) <- "RNA"
+for(sub in subtypes){
+  genes <- top_TFs$gene[top_TFs$cluster==sub]
+  if(length(genes)>0) Merged_Neurons <- AddModuleScore(Merged_Neurons, features=list(genes), ctrl=15, name=paste0(sub,"_TF"))
+}
+
+
+
+Merged_Neurons <- subset(Merged_Neurons, subset = sample %in% samples_to_plot)
+Merged_Neurons$sample <- factor(Merged_Neurons$sample, levels = samples_to_plot)
+Idents(Merged_Neurons) <- "sample"
+
+
+# ---- Boxplot function ----
+bp <- function(f){
+  SCpubr::do_BoxPlot(Merged_Neurons, feature=f, split.by="sample") +
+    scale_fill_manual(values=colors) +
+    coord_cartesian(ylim=c(-1,1.5)) +
+    ggtitle(f)
+}
+
+# ---- Plot all 4 module scores ----
+bp("Lamp5_P28_TF1") | bp("Vip_P28_TF1") | bp("Sst_P28_TF1") | bp("Pvalb_P28_TF1")
+
+
+# ---- Optional: inspect top TFs per subtype ----
+###TFs printed per subtype, sorted by descending fold change (avg_log2FC).
+lapply(subtypes, function(sub) { tfs <- top_TFs[top_TFs$cluster==sub, ]; tfs <- tfs[order(-tfs$avg_log2FC), ]; cat("\nTop TFs for", sub, "(", nrow(tfs), "TFs):", paste(tfs$gene, collapse=", "), "\n") })
+
+
+```
+
+##Figure 7 for Vln plots ##Figure 7f
+```{r}
+library(Seurat); library(SCpubr); library(MAST); library(patchwork); library(dplyr)
+
+# ---- Samples, colors & subtypes ----
+samples <- c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi","Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+colors <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A",
+            "Lamp5_P28"="#4D4D4D","Vip_P28"="#5F5F5F","Sst_P28"="#9E9E9E","Pvalb_P28"="#BDBDBD")
+subtypes <- c("Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+
+# ---- Subset neurons ----
+Merged_Neurons <- subset(Neurons, sample %in% samples); Merged_Neurons$sample <- factor(Merged_Neurons$sample, levels=samples); Idents(Merged_Neurons) <- "sample"
+
+# ---- Subset P28 interneurons ----
+P28_Neurons <- subset(Merged_Neurons, sample %in% subtypes)
+
+# ---- DEGs using MAST ----
+DEG_P28_Neurons <- FindAllMarkers(P28_Neurons, test.use="MAST", logfc.threshold=0.2, min.pct=0.2, only.pos=TRUE)
+
+# ---- Load TF list & subset ----
+list_TFs <- read.csv("list_TFs.csv", header=TRUE, stringsAsFactors=FALSE)
+DEG_P28_Neurons_TFs <- DEG_P28_Neurons[DEG_P28_Neurons$gene %in% list_TFs$TFs, ]
+
+# ---- Filter TFs per subtype & compute score ----
+top_TFs_list <- lapply(subtypes, function(cl){
+  tmp <- DEG_P28_Neurons_TFs[DEG_P28_Neurons_TFs$cluster==cl &
+                              DEG_P28_Neurons_TFs$pct.1>=0.5 & ### Keeps only genes expressed in at least 50% of cells within the cluster.Ensures the TF is robustly expressed in that subtype.
+                              DEG_P28_Neurons_TFs$pct.2<=0.7 & ## Keeps only genes expressed in 60% or fewer cells outside the cluster., Ensures the TF is relatively specific, lower more stringent
+                              DEG_P28_Neurons_TFs$avg_log2FC>=0.5, ] ## Only keeps genes with log2 fold-change ≥ 0.5,
+  if(nrow(tmp)==0) return(NULL)
+  tmp$score <- tmp$avg_log2FC * (tmp$pct.1 - tmp$pct.2)
+  tmp[order(-tmp$score), ]
+})
+top_TFs <- do.call(rbind, top_TFs_list)
+
+# ---- Add module scores ----
+DefaultAssay(Merged_Neurons) <- "RNA"
+for(cl in subtypes){genes <- top_TFs$gene[top_TFs$cluster==cl]; if(length(genes)>0) Merged_Neurons <- AddModuleScore(Merged_Neurons, list(genes), ctrl=15, name=paste0(cl,"_TF"))}
+
+# ---- Boxplot function ----
+bp <- function(f) SCpubr::do_BoxPlot(Merged_Neurons, feature=f, split.by="sample") +
+  scale_fill_manual(values=colors) + coord_cartesian(ylim=c(-0.8,1.1)) + ggtitle(f)
+
+# ---- Plot all 4 module scores across all 6 samples ----
+bp("Lamp5_P28_TF1") | bp("Vip_P28_TF1") | bp("Sst_P28_TF1") | bp("Pvalb_P28_TF1")
+
+
+
+library(patchwork)
+
+library(patchwork)
+
+library(patchwork)
+
+library(patchwork)
+
+y_text_size <- 16  # adjust as needed
+
+(bp("Lamp5_P28_TF1") + theme(axis.text.x = element_blank(),
+                               axis.ticks.x = element_blank(),
+                               axis.title.x = element_blank(),
+                               axis.line.x = element_blank(),
+                               legend.position = "none",
+                               axis.title.y = element_blank(),
+                               plot.title = element_blank(),
+                               axis.text.y = element_text(size = y_text_size))) /
+(bp("Vip_P28_TF1") + theme(axis.text.x = element_blank(),
+                            axis.ticks.x = element_blank(),
+                            axis.title.x = element_blank(),
+                            axis.line.x = element_blank(),
+                            legend.position = "none",
+                            axis.title.y = element_blank(),
+                            plot.title = element_blank(),
+                            axis.text.y = element_text(size = y_text_size))) /
+(bp("Sst_P28_TF1") + theme(axis.text.x = element_blank(),
+                            axis.ticks.x = element_blank(),
+                            axis.title.x = element_blank(),
+                            axis.line.x = element_blank(),
+                            legend.position = "none",
+                            axis.title.y = element_blank(),
+                            plot.title = element_blank(),
+                            axis.text.y = element_text(size = y_text_size))) /
+(bp("Pvalb_P28_TF1") + theme(axis.text.x = element_blank(),
+                              axis.ticks.x = element_blank(),
+                              axis.title.x = element_blank(),
+                              axis.line.x = element_blank(),
+                              legend.position = "none",
+                              axis.title.y = element_blank(),
+                              plot.title = element_blank(),
+                              axis.text.y = element_text(size = y_text_size)))
+
+
+
+
+
+# ---- Optional: print top TFs per subtype ----
+lapply(subtypes, function(cl){tfs <- top_TFs[top_TFs$cluster==cl, ]; tfs <- tfs[order(-tfs$score), ]; cat("\nTop TFs for", cl, "(", nrow(tfs), "):", paste(tfs$gene, collapse=", "), "\n")})
+
+```
+
+
+
+```{r}
+lapply(seq_along(subtypes), function(i)
+  data.frame(
+    gene = top5_TFs[[i]],
+    avg_log2FC = top_TFs$avg_log2FC[top_TFs$cluster==subtypes[i]][
+      order(-top_TFs$avg_log2FC[top_TFs$cluster==subtypes[i]])][1:length(top5_TFs[[i]])]
+  )
+)
+
+```
+
+
+
+```{r}
+library(Seurat); library(SCpubr); library(patchwork)
+
+samples_levels <- c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi","Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+colors <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A", "Lamp5_P28"="#4D4D4D","Vip_P28"="#5F5F5F","Sst_P28"="#9E9E9E","Pvalb_P28"="#BDBDBD")
+subtypes <- c("Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+
+# Top 5 TFs per subtype
+top5_TFs <- lapply(subtypes, function(cl) {
+  genes <- top_TFs$gene[top_TFs$cluster==cl]
+  genes <- genes[order(-top_TFs$avg_log2FC[top_TFs$cluster==cl])] #### here I order based on avg_log2FC
+  head(genes,35)
+})
+
+# Create violin plots safely
+plots <- lapply(seq_along(subtypes), function(i) {
+  genes <- top5_TFs[[i]]
+  if(length(genes)==0) return(NULL)
+  VlnPlot(Merged_Neurons, features=genes, group.by="sample", fill.by="ident",
+          stack=TRUE, flip=TRUE, pt.size=0, cols=colors) +
+    NoLegend() + ggtitle(subtypes[i]) +
+    theme(panel.grid=element_blank(), panel.border=element_rect(color="black", fill=NA), text=element_text(size=14))
+})
+
+wrap_plots(plots[!sapply(plots,is.null)], ncol=4)
+
+
+library(Seurat); library(SCpubr); library(patchwork)
+
+# ---- Flatten top5_TFs into one vector, keep track of cluster (optional for title) ----
+all_top5 <- unlist(top5_TFs)
+names(all_top5) <- rep(subtypes, sapply(top5_TFs,length))
+
+# ---- Violin plot of all top TFs in one stacked plot ----
+VlnPlot(Merged_Neurons, features=all_top5, group.by="sample", fill.by="ident",
+        stack=TRUE, flip=TRUE, pt.size=0, cols=colors) +
+  NoLegend() +
+  ggtitle("Top 5 TFs per Subtype") +
+  ylab("Gene Name") +
+  theme(panel.grid=element_blank(),
+        panel.border=element_rect(color="black", fill=NA),
+        text=element_text(size=14))
+
+```
+
+
+
+
+
+
+
+
+###playing around with filters
+```{r}
+library(Seurat); library(SCpubr); library(MAST); library(patchwork); library(dplyr)
+
+# ---- Samples, colors & subtypes ----
+samples <- c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi","Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+colors <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A",
+            "Lamp5_P28"="#4D4D4D","Vip_P28"="#5F5F5F","Sst_P28"="#9E9E9E","Pvalb_P28"="#BDBDBD")
+subtypes <- c("Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+
+# ---- Subset neurons ----
+Merged_Neurons <- subset(Neurons, sample %in% samples); Merged_Neurons$sample <- factor(Merged_Neurons$sample, levels=samples); Idents(Merged_Neurons) <- "sample"
+
+# ---- Subset P28 interneurons ----
+P28_Neurons <- subset(Merged_Neurons, sample %in% subtypes)
+
+# ---- DEGs using MAST ----
+DEG_P28_Neurons <- FindAllMarkers(P28_Neurons, test.use="MAST", logfc.threshold=0.2, min.pct=0.2, only.pos=TRUE)
+
+# ---- Load TF list & subset ----
+list_TFs <- read.csv("list_TFs.csv", header=TRUE, stringsAsFactors=FALSE)
+DEG_P28_Neurons_TFs <- DEG_P28_Neurons[DEG_P28_Neurons$gene %in% list_TFs$TFs, ]
+
+# ---- Filter TFs per subtype & compute score ----
+top_TFs_list <- lapply(subtypes, function(cl){
+  tmp <- DEG_P28_Neurons_TFs[DEG_P28_Neurons_TFs$cluster==cl &
+                              DEG_P28_Neurons_TFs$pct.1>=0.3 & ### Keeps only genes expressed in at least 50% of cells within the cluster.Ensures the TF is robustly expressed in that subtype.
+                              DEG_P28_Neurons_TFs$pct.2<=0.8 & ## Keeps only genes expressed in 60% or fewer cells outside the cluster., Ensures the TF is relatively specific, lower more stringent
+                              DEG_P28_Neurons_TFs$avg_log2FC>=0.5, ] ## Only keeps genes with log2 fold-change ≥ 0.5,
+  if(nrow(tmp)==0) return(NULL)
+  tmp$score <- tmp$avg_log2FC * (tmp$pct.1 - tmp$pct.2)
+  tmp[order(-tmp$score), ]
+})
+top_TFs <- do.call(rbind, top_TFs_list)
+
+# ---- Add module scores ----
+DefaultAssay(Merged_Neurons) <- "RNA"
+for(cl in subtypes){genes <- top_TFs$gene[top_TFs$cluster==cl]; if(length(genes)>0) Merged_Neurons <- AddModuleScore(Merged_Neurons, list(genes), ctrl=15, name=paste0(cl,"_TF"))}
+
+# ---- Boxplot function ----
+bp <- function(f) SCpubr::do_BoxPlot(Merged_Neurons, feature=f, split.by="sample") +
+  scale_fill_manual(values=colors) + coord_cartesian(ylim=c(-0.3,0.4)) + ggtitle(f)
+
+# ---- Plot all 4 module scores across all 6 samples ----
+bp("Lamp5_P28_TF1") | bp("Vip_P28_TF1") | bp("Sst_P28_TF1") | bp("Pvalb_P28_TF1")
+
+
+
+library(patchwork)
+
+library(patchwork)
+
+library(patchwork)
+
+library(patchwork)
+
+y_text_size <- 16  # adjust as needed
+
+(bp("Lamp5_P28_TF1") + theme(axis.text.x = element_blank(),
+                               axis.ticks.x = element_blank(),
+                               axis.title.x = element_blank(),
+                               axis.line.x = element_blank(),
+                               legend.position = "none",
+                               axis.title.y = element_blank(),
+                               plot.title = element_blank(),
+                               axis.text.y = element_text(size = y_text_size))) /
+(bp("Vip_P28_TF1") + theme(axis.text.x = element_blank(),
+                            axis.ticks.x = element_blank(),
+                            axis.title.x = element_blank(),
+                            axis.line.x = element_blank(),
+                            legend.position = "none",
+                            axis.title.y = element_blank(),
+                            plot.title = element_blank(),
+                            axis.text.y = element_text(size = y_text_size))) /
+(bp("Sst_P28_TF1") + theme(axis.text.x = element_blank(),
+                            axis.ticks.x = element_blank(),
+                            axis.title.x = element_blank(),
+                            axis.line.x = element_blank(),
+                            legend.position = "none",
+                            axis.title.y = element_blank(),
+                            plot.title = element_blank(),
+                            axis.text.y = element_text(size = y_text_size))) /
+(bp("Pvalb_P28_TF1") + theme(axis.text.x = element_blank(),
+                              axis.ticks.x = element_blank(),
+                              axis.title.x = element_blank(),
+                              axis.line.x = element_blank(),
+                              legend.position = "none",
+                              axis.title.y = element_blank(),
+                              plot.title = element_blank(),
+                              axis.text.y = element_text(size = y_text_size)))
+
+
+
+
+
+# ---- Optional: print top TFs per subtype ----
+lapply(subtypes, function(cl){tfs <- top_TFs[top_TFs$cluster==cl, ]; tfs <- tfs[order(-tfs$score), ]; cat("\nTop TFs for", cl, "(", nrow(tfs), "):", paste(tfs$gene, collapse=", "), "\n")})
+```
+
+### For Figure 7d (see prepocessing 13_Figure_4_5_6)
+```{r}
+library(Seurat); library(ggplot2)
+
+cols <- c("Ascl1SA6Bcl2_2wpi" = "#9400D3","Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A","Ascl1SA6Dlx2_2wpi" = "#32CD32","Other"="lightgrey")
+rv <- c("Ascl1SA6Bcl2_2wpi", "Ascl1SA6Dlx2_2wpi", "Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi")
+
+cols <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A","Other"="lightgrey")
+rv <- c( "Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi")
+
+
+A2Ns_900$highlight <- factor(ifelse(as.character(A2Ns_900$RV) %in% rv, as.character(A2Ns_900$RV),"Other"),
+                             levels = names(cols))
+DimPlot(A2Ns_900, group.by="highlight", cols=cols, pt.size=0.5) + Blank_Theme() + scale_x_reverse() + scale_y_reverse()
+
+```
+
+
+
+##Figure 7f and  S14b
+```{r}
+library(Seurat)
+library(SCpubr)
+library(MAST)
+library(patchwork)
+library(dplyr)
+
+# ---- Samples, colors & subtypes ----
+samples <- c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi",
+             "Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+
+colors <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD",
+            "Ascl1SA6Dlx2_4wpi"="#00FA9A",
+            "Lamp5_P28"="#4D4D4D",
+            "Vip_P28"="#5F5F5F",
+            "Sst_P28"="#9E9E9E",
+            "Pvalb_P28"="#BDBDBD")
+
+subtypes <- c("Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+
+# ---- Subset neurons ----
+Merged_Neurons <- subset(Neurons, sample %in% samples)
+Merged_Neurons$sample <- factor(Merged_Neurons$sample, levels = samples)
+Idents(Merged_Neurons) <- "sample"
+
+# ---- Subset P28 interneurons ----
+P28_Neurons <- subset(Merged_Neurons, sample %in% subtypes)
+
+# ---- DEGs using MAST (no downstream filtering) ----
+DEG_P28_Neurons <- FindAllMarkers(
+  P28_Neurons,
+  test.use = "MAST",
+  logfc.threshold = 0.2,
+  min.pct = 0.2,
+  only.pos = TRUE
+)
+
+# ---- Load TF list & subset ----
+list_TFs <- read.csv("list_TFs.csv", stringsAsFactors = FALSE)
+DEG_P28_Neurons_TFs <- DEG_P28_Neurons[
+  DEG_P28_Neurons$gene %in% list_TFs$TFs, ]
+
+# ---- Rank TFs per subtype (NO FILTERING) ----
+top_TFs_list <- lapply(subtypes, function(cl) {
+  tmp <- DEG_P28_Neurons_TFs[DEG_P28_Neurons_TFs$cluster == cl, ]
+  if (nrow(tmp) == 0) return(NULL)
+
+  tmp$score <- tmp$avg_log2FC * (tmp$pct.1 - tmp$pct.2)
+  tmp[order(-tmp$score), ]
+})
+
+top_TFs <- do.call(rbind, top_TFs_list)
+
+# ---- Add module scores ----
+DefaultAssay(Merged_Neurons) <- "RNA"
+
+for (cl in subtypes) {
+  genes <- top_TFs$gene[top_TFs$cluster == cl]
+  if (length(genes) > 0) {
+    Merged_Neurons <- AddModuleScore(
+      Merged_Neurons,
+      features = list(genes),
+      ctrl = 15,
+      name = paste0(cl, "_TF")
+    )
+  }
+}
+
+# ---- Boxplot function ----
+bp <- function(f)
+  SCpubr::do_BoxPlot(Merged_Neurons, feature = f, split.by = "sample") +
+  scale_fill_manual(values = colors) +
+  coord_cartesian(ylim = c(-0.5, 1.1)) +
+  ggtitle(f)
+
+# ---- Plot module scores ----
+y_text_size <- 16
+
+(bp("Lamp5_P28_TF1") + theme(axis.text.x = element_blank(),
+                            axis.ticks.x = element_blank(),
+                            axis.title.x = element_blank(),
+                            axis.line.x = element_blank(),
+                            legend.position = "none",
+                            axis.title.y = element_blank(),
+                            plot.title = element_blank(),
+                            axis.text.y = element_text(size = y_text_size))) /
+(bp("Vip_P28_TF1") + theme(axis.text.x = element_blank(),
+                          axis.ticks.x = element_blank(),
+                          axis.title.x = element_blank(),
+                          axis.line.x = element_blank(),
+                          legend.position = "none",
+                          axis.title.y = element_blank(),
+                          plot.title = element_blank(),
+                          axis.text.y = element_text(size = y_text_size))) /
+(bp("Sst_P28_TF1") + theme(axis.text.x = element_blank(),
+                          axis.ticks.x = element_blank(),
+                          axis.title.x = element_blank(),
+                          axis.line.x = element_blank(),
+                          legend.position = "none",
+                          axis.title.y = element_blank(),
+                          plot.title = element_blank(),
+                          axis.text.y = element_text(size = y_text_size))) /
+(bp("Pvalb_P28_TF1") + theme(axis.text.x = element_blank(),
+                            axis.ticks.x = element_blank(),
+                            axis.title.x = element_blank(),
+                            axis.line.x = element_blank(),
+                            legend.position = "none",
+                            axis.title.y = element_blank(),
+                            plot.title = element_blank(),
+                            axis.text.y = element_text(size = y_text_size)))
+
+# ---- Print ranked TFs per subtype ----
+lapply(subtypes, function(cl) {
+  tfs <- top_TFs[top_TFs$cluster == cl, ]
+  cat("\nTFs for", cl, "(", nrow(tfs), "):",
+      paste(tfs$gene, collapse = ", "), "\n")
+})
+
+```
+
+```{r}
+library(Seurat); library(SCpubr); library(patchwork)
+
+samples_levels <- c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi","Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+colors <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD","Ascl1SA6Dlx2_4wpi"="#00FA9A", "Lamp5_P28"="#4D4D4D","Vip_P28"="#5F5F5F","Sst_P28"="#9E9E9E","Pvalb_P28"="#BDBDBD")
+subtypes <- c("Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+
+# Top 5 TFs per subtype
+top5_TFs <- lapply(subtypes, function(cl) {
+  genes <- top_TFs$gene[top_TFs$cluster==cl]
+  genes <- genes[order(-top_TFs$avg_log2FC[top_TFs$cluster==cl])] #### here I order based on avg_log2FC
+  head(genes,35)
+})
+
+top5_TFs <- lapply(subtypes, function(cl) {
+  tmp <- top_TFs[top_TFs$cluster == cl, ]
+  tmp <- tmp[order(-tmp$avg_log2FC), ]
+  head(tmp$gene, 35)
+})
+
+
+# Create violin plots safely
+plots <- lapply(seq_along(subtypes), function(i) {
+  genes <- top5_TFs[[i]]
+  if(length(genes)==0) return(NULL)
+  VlnPlot(Merged_Neurons, features=genes, group.by="sample", fill.by="ident",
+          stack=TRUE, flip=TRUE, pt.size=0, cols=colors) +
+    NoLegend() + ggtitle(subtypes[i]) +
+    theme(panel.grid=element_blank(), panel.border=element_rect(color="black", fill=NA), text=element_text(size=14))
+})
+
+wrap_plots(plots[!sapply(plots,is.null)], ncol=4)
+
+
+library(Seurat); library(SCpubr); library(patchwork)
+
+# ---- Flatten top5_TFs into one vector, keep track of cluster (optional for title) ----
+all_top5 <- unlist(top5_TFs)
+names(all_top5) <- rep(subtypes, sapply(top5_TFs,length))
+
+# ---- Violin plot of all top TFs in one stacked plot ----
+VlnPlot(Merged_Neurons, features=all_top5, group.by="sample", fill.by="ident",
+        stack=TRUE, flip=TRUE, pt.size=0, cols=colors) +
+  NoLegend() +
+  ggtitle("Top 5 TFs per Subtype") +
+  ylab("Gene Name") +
+  theme(panel.grid=element_blank(),
+        panel.border=element_rect(color="black", fill=NA),
+        text=element_text(size=14))
+
+```
+
+
+
+
+```{r}
+library(dplyr)
+library(pheatmap)
+
+samples_all <- c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi",
+                 "Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+
+features_to_test <- c("Lamp5_P28_TF1",
+                      "Vip_P28_TF1",
+                      "Sst_P28_TF1",
+                      "Pvalb_P28_TF1")
+
+Merged_Neurons$sample <- factor(Merged_Neurons$sample, levels = samples_all)
+
+# Aggregate mean module scores per sample
+agg_scores <- Merged_Neurons@meta.data %>%
+    dplyr::select(sample, all_of(features_to_test)) %>%
+    group_by(sample) %>%
+    summarise(across(all_of(features_to_test), mean, na.rm = TRUE)) %>%
+    column_to_rownames("sample")
+
+# Correlation matrix (samples x samples)
+cor_matrix <- cor(t(agg_scores), method = "pearson")
+
+# Define color palette
+cols <- colorRampPalette(c("white", "magenta", "#B000B0","#352A38"))(50)
+
+# Function to map correlation value to text color
+cell_fun <- function(j, i, x, y, width, height, fill) {
+    # If background is dark magenta (top ~20% of palette), set text to white
+    col_index <- round(cor_matrix[i, j] * (length(cols) - 1)) + 1
+    text_col <- ifelse(col_index > length(cols) * 0.7, "white", "black")
+    grid::grid.text(sprintf("%.2f", cor_matrix[i, j]), x, y, gp = grid::gpar(col = text_col, fontsize = 14))
+}
+
+# Plot heatmap
+pheatmap(cor_matrix,
+         main = "Sample Correlation (TF Module Scores)",
+         cluster_rows = FALSE,
+         cluster_cols = FALSE,
+         color = cols,
+         display_numbers = FALSE,  # numbers handled in cell_fun
+         cell_fun = cell_fun)
+
+
+# Save correlation matrix
+write.csv(cor_matrix, "~/Desktop/samples_TF_module_score_correlation.csv")
+```
+
+### FInale for Figure with White text on dark field ##Figure 7g
+```{r}
+library(dplyr)
+library(pheatmap)
+library(grid)
+
+samples_all <- c("Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi",
+                 "Lamp5_P28","Vip_P28","Sst_P28","Pvalb_P28")
+
+features_to_test <- c("Lamp5_P28_TF1",
+                      "Vip_P28_TF1",
+                      "Sst_P28_TF1",
+                      "Pvalb_P28_TF1")
+
+Merged_Neurons$sample <- factor(Merged_Neurons$sample, levels = samples_all)
+
+# Aggregate mean module scores per sample
+agg_scores <- Merged_Neurons@meta.data %>%
+    dplyr::select(sample, all_of(features_to_test)) %>%
+    group_by(sample) %>%
+    summarise(across(all_of(features_to_test), mean, na.rm = TRUE)) %>%
+    column_to_rownames("sample")
+
+# Correlation matrix
+cor_matrix <- cor(t(agg_scores), method = "pearson")
+
+# Color palette
+cols <- colorRampPalette(c("white", "#E000E0", "#B000B0", "#352A38"))(50)
+
+# Cell function with direct threshold
+cell_fun <- function(j, i, x, y, width, height, fill) {
+    val <- cor_matrix[i, j]
+    text_col <- ifelse(val > 0.55, "white", "black")
+    grid.text(sprintf("%.2f", val),
+              x, y,
+              gp = gpar(col = text_col, fontsize = 14))
+}
+
+pheatmap(cor_matrix,
+         main = "Sample Correlation (TF Module Scores)",
+         cluster_rows = FALSE,
+         cluster_cols = FALSE,
+         color = cols,
+         display_numbers = FALSE,
+         cell_fun = cell_fun)
+
+```
+
+
+
+##Figure S14 a
+```{r}
+plots <- lapply(subtypes, function(cl) {
+
+  # Subset cluster
+  tmp <- top_TFs[top_TFs$cluster == cl, ]
+  if (nrow(tmp) == 0) return(NULL)
+
+  # Rank score: effect size × expression frequency
+  tmp$rank_score <- tmp$avg_log2FC * tmp$pct.1
+
+  # Order descending
+  tmp <- tmp[order(-tmp$rank_score), ]
+
+  # Select top genes
+  genes <- tmp$gene[1:min(35, nrow(tmp))]
+
+  VlnPlot(Merged_Neurons,
+          features = genes,
+          group.by = "sample",
+          fill.by = "ident",
+          stack = TRUE,
+          flip = TRUE,
+          pt.size = 0,
+          cols = colors) +
+    NoLegend() +
+    ggtitle(paste0(cl, " (ranked by log2FC × pct.1)")) +
+    theme(panel.grid = element_blank(),
+          panel.border = element_rect(color = "black", fill = NA),
+          text = element_text(size = 14))
+})
+
+wrap_plots(plots[!sapply(plots, is.null)], ncol = 4)
+
+```
+
+
+##Figure S14 a
+```{r}
+
+plots <- lapply(subtypes, function(cl) {
+
+  tmp <- top_TFs[top_TFs$cluster == cl, ]
+  if (nrow(tmp) == 0) return(NULL)
+
+  tmp$rank_score <- tmp$avg_log2FC * tmp$pct.1
+  tmp <- tmp[order(-tmp$rank_score), ]
+
+  genes <- tmp$gene[1:min(35, nrow(tmp))]
+
+  VlnPlot(Merged_Neurons,
+          features = genes,
+          group.by = "sample",
+          fill.by = "ident",
+          stack = TRUE,
+          flip = TRUE,
+          pt.size = 0,
+          cols = colors) +
+    NoLegend() +
+    ggtitle(paste0(cl, " (ranked by log2FC × pct.1)")) +
+    theme(
+      panel.grid = element_blank(),
+      panel.border = element_rect(color = "black", fill = NA),
+      plot.title = element_text(size = 12)   # smaller title only
+    )
+})
+
+
+# Create final combined plot
+final_plot <- wrap_plots(plots[!sapply(plots, is.null)], ncol = 4)
+
+# Save square TIFF
+ggsave("~/Desktop/Top_TFs_per_Subtype_square.tiff",
+       plot = final_plot,
+       width = 14,
+       height = 14,
+       units = "in",
+       dpi = 600,
+       compression = "lzw")
+
+# Optional: also save vector PDF
+ggsave("~/Desktop/Top_TFs_per_Subtype_square.pdf",
+       plot = final_plot,
+       width = 14,
+       height = 14,
+       units = "in")
+
+
+```
+

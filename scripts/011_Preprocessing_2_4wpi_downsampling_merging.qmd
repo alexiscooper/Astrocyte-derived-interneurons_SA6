@@ -1,0 +1,263 @@
+
+```{r}
+#| label: reportsetup
+#| include: false
+knitr::opts_chunk$set(echo = T, include = T,
+                      fig.width = 8, fig.height = 6,
+                      fig.align = 'center',
+                      warning = F, message = F,
+                      eval=T) 
+```
+
+
+The space below contain the codes used in this analysis for the purposes of
+transparency and reproducibility:
+
+<!-- Describe methodology -->
+
+## Load dependencies
+The code below loads all dependencies to run the script.
+```{r}
+#| label: load_dependencies
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+suppressPackageStartupMessages({
+    library(tidyverse)
+    library(Seurat)
+    library(ggplot2)
+    library(patchwork)
+    library(UpSetR)
+    library(harmony)
+    library(clustree)
+    library(MatrixGenerics)
+  library(glmGamPoi)
+})
+```
+
+# Loading of data 
+
+```{r}
+#| label: load_data
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+seuratlist.2wpi.filtered <- readRDS("/seuratlist_2wpi_LogNorm_filt_reporter_genes.rds")
+```
+
+```{r}
+#| label: vln_plot_postfilt
+#| eval: true
+#| include: true
+#| classes: styled-output
+#| height: 8
+
+# Plot mitochondrial genes, ribosomal genes, and number of RNA counts per dataset
+lapply(seuratlist.2wpi.filtered, function(sample) {
+  plots <- lapply(c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"), function(feature) {
+    VlnPlot(sample, features = feature, pt.size = 0.01) +  # No group.by to avoid clustering split
+      theme(plot.title = element_text(size = 15, face = "plain"),
+            axis.title.x = element_text(size = 15),
+            axis.title.y = element_text(size = 15),
+            axis.text = element_text(size = 15),
+            legend.key.size = unit(0.5, 'cm'),
+            legend.key.height = unit(0.5, 'cm'),
+            legend.key.width = unit(0.5, 'cm'),
+            legend.title = element_text(size = 15),
+            legend.text = element_text(size = 15),
+            legend.position = "none")
+  })
+  
+  # Combine and arrange the plots
+  wrap_plots(plots, ncol = 4) + 
+    plot_annotation(title = sample$orig.ident[1], 
+                    theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 25)))
+})
+
+```
+
+#Performing Normalization and dimensional reduction via pca for each sample
+```{r}
+#| label: dim_red_pca
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Increasing maximum size allowed for Global size  
+options(future.globals.maxSize = 8000 * 1024^2)
+
+## Run LogNorm, FindVariableFeatures and Scale on filtered samples
+seuratlist.2wpi.filtered <- lapply(seuratlist.2wpi.filtered, function(sample){
+  sample <- FindVariableFeatures(sample, selection.method = "vst", nfeatures = 2000)
+  sample <- ScaleData(sample, features = rownames(sample))
+})
+
+## Perform dimensional reduction
+seuratlist.2wpi.filtered <- lapply(seuratlist.2wpi.filtered, function(sample){
+	sample <- RunPCA(sample)
+  sample 
+})
+```
+```{r}
+saveRDS(seuratlist.2wpi.filtered, "/seuratlist_2wpi_LogNorm_filt_reporter_genes.rds")
+```
+
+```{r}
+#####Scaling
+old_total_counts_Ascl1SA6Bcl2_mat <- colSums(GetAssayData(seuratlist.2wpi.filtered[["Ascl1SA6Bcl2_mat"]], assay = "RNA", layer = "counts"))
+mean(old_total_counts_Ascl1SA6Bcl2_mat)
+
+# Step 1: Get the counts for Ascl1SA6Bcl2_mat and Ascl1SA6Dlx2_mat using GetAssayData
+counts_Ascl1SA6Bcl2_mat <- GetAssayData(seuratlist.2wpi.filtered[["Ascl1SA6Bcl2_mat"]], assay = "RNA", layer = "counts")
+counts_Ascl1SA6Dlx2_mat <- GetAssayData(seuratlist.2wpi.filtered[["Ascl1SA6Dlx2_mat"]], assay = "RNA", layer = "counts")
+
+# Step 2: Calculate total counts per cell for both samples
+total_counts_Ascl1SA6Bcl2_mat <- colSums(counts_Ascl1SA6Bcl2_mat)
+total_counts_Ascl1SA6Dlx2_mat <- colSums(counts_Ascl1SA6Dlx2_mat)
+
+# Step 3: Calculate the mean total counts per cell for both samples
+mean_counts_Ascl1SA6Bcl2_mat <- mean(total_counts_Ascl1SA6Bcl2_mat)
+mean_counts_Ascl1SA6Dlx2_mat <- mean(total_counts_Ascl1SA6Dlx2_mat)
+
+# Step 4: Calculate scaling factor
+scaling_factor <- mean_counts_Ascl1SA6Dlx2_mat / mean_counts_Ascl1SA6Bcl2_mat  ###scaling_factor 0.4938886
+scaling_factor
+```
+
+```{r}
+#| label: varfeat_overlap
+#| eval: false
+#| include: true
+#| classes: styled-output
+# Assign each Seurat object to a new variable without the 'seurat_' prefix
+Ascl1SA6 <- seuratlist.2wpi.filtered[["Ascl1SA6"]]
+Bcl2 <- seuratlist.2wpi.filtered[["Bcl2"]]
+Ascl1SA6Bcl2 <- seuratlist.2wpi.filtered[["Ascl1SA6Bcl2"]]
+Ascl1SA6Dlx2 <- seuratlist.2wpi.filtered[["Ascl1SA6Dlx2"]]
+Ascl1WTSA6 <- seuratlist.2wpi.filtered[["Ascl1WTSA6"]]
+Ascl1WT <- seuratlist.2wpi.filtered[["Ascl1WT"]]
+Ascl1WTBcl2 <- seuratlist.2wpi.filtered[["Ascl1WTBcl2"]]
+Ascl1WTDlx2 <- seuratlist.2wpi.filtered[["Ascl1WTDlx2"]]
+Ascl1SA6Dlx2_2 <- seuratlist.2wpi.filtered[["Ascl1SA6Dlx2_2"]]
+Control <- seuratlist.2wpi.filtered[["Control"]]
+Ascl1SA6Bcl2_mat <- seuratlist.2wpi.filtered[["Ascl1SA6Bcl2_mat"]]
+Ascl1SA6Dlx2_mat <- seuratlist.2wpi.filtered[["Ascl1SA6Dlx2_mat"]]
+
+# Set seed for reproducibility
+set.seed(123)
+# Downsample Control to 1000 cells
+Control_cells <- sample(Cells(Control), size = 2000, replace = FALSE)
+Control <- subset(Control, cells = Control_cells)
+
+# Define the scaling factor
+scaling_factor <- 0.4938886
+scaling_factor <- 0.5
+# Extract raw counts for Ascl1SA6Bcl2_mat
+counts_Ascl1SA6Bcl2_mat <- GetAssayData(Ascl1SA6Bcl2_mat, assay = "RNA", slot = "counts")
+
+# Apply the scaling factor to adjust the counts
+scaled_counts_Ascl1SA6Bcl2_mat <- counts_Ascl1SA6Bcl2_mat * 0.5 #scaling_factor 0.6653017
+
+# Update the counts in the Ascl1SA6Bcl2_mat Seurat object
+Ascl1SA6Bcl2_mat[["RNA"]] <- SetAssayData(
+  object = Ascl1SA6Bcl2_mat[["RNA"]],
+  slot = "counts",
+  new.data = scaled_counts_Ascl1SA6Bcl2_mat
+)
+
+# Recalculate nCount_RNA for Ascl1SA6Bcl2_mat
+Ascl1SA6Bcl2_mat <- AddMetaData(
+  object = Ascl1SA6Bcl2_mat,
+  metadata = colSums(GetAssayData(Ascl1SA6Bcl2_mat, assay = "RNA", slot = "counts")), col.name = "nCount_RNA")
+
+
+mean_nCount_Ascl1SA6Bcl2_mat <- mean(Ascl1SA6Bcl2_mat@meta.data$nCount_RNA)
+
+print(paste("Mean nCount_RNA for Ascl1SA6Bcl2_mat:", mean_nCount_Ascl1SA6Bcl2_mat))
+
+mean_nCount_Ascl1SA6Dlx2_mat <- mean(Ascl1SA6Dlx2_mat@meta.data$nCount_RNA)
+
+print(paste("Mean nCount_RNA for Ascl1SA6Dlx2_mat:", mean_nCount_Ascl1SA6Dlx2_mat))
+
+
+
+# Merge all Seurat objects
+mergeAll <- merge(
+  x = Ascl1SA6,
+  y = list(Ascl1SA6Bcl2,Ascl1SA6Dlx2,Ascl1WTSA6,Ascl1WT, Ascl1WTBcl2,Ascl1WTDlx2,Ascl1SA6Dlx2_2,Control,Ascl1SA6Bcl2_mat,Ascl1SA6Dlx2_mat),
+  add.cell.ids = c(
+    "Ascl1SA6","Ascl1SA6Bcl2", "Ascl1SA6Dlx2","Ascl1WTSA6","Ascl1WT", "Ascl1WTBcl2", "Ascl1WTDlx2","Ascl1SA6Dlx2_2", "Control", "Ascl1SA6Bcl2_mat", "Ascl1SA6Dlx2_mat"
+  ),
+  project = "MergedProject",
+  merge.data = TRUE  # Merge normalized data as well
+)
+remove( "Ascl1SA6","Ascl1SA6Bcl2", "Ascl1SA6Dlx2","Ascl1WTSA6","Ascl1WT", "Ascl1WTBcl2", "Ascl1WTDlx2","Ascl1SA6Dlx2_2", "Control", "Ascl1SA6Bcl2_mat", "Ascl1SA6Dlx2_mat", "counts_Ascl1SA6Bcl2_mat", "counts_Ascl1SA6Dlx2_mat")
+```
+
+
+```{r}
+saveRDS(seuratlist.2wpi.filtered, "/seuratlist_2wpi_LogNorm_filt_reporter_genes_scale_SA6Blc2_mat.rds")
+```
+
+
+
+
+We obtain the overlap of variable features per sample. In this case, 40.6% of 
+3000 variable features are shared between all samples.
+
+```{r}
+#| label: varfeat_overlap
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Computing the overlap of variable features between samples
+var.feat <- lapply(seuratlist.2wpi.filtered, VariableFeatures)
+
+upset(fromList(var.feat), sets = names(var.feat),
+      sets.bar.color = "#56B4E9", order.by = "freq",main.bar.color = "#660099")
+```
+
+```{r}
+# Ensure data layers are joined before continuing
+mergeAll[["RNA"]] <- JoinLayers(mergeAll[["RNA"]])
+
+# Recalculate nCount_RNA for merged object after scaling
+mergeAll <- AddMetaData(mergeAll, metadata = colSums(GetAssayData(mergeAll, assay = "RNA", slot = "counts")), col.name = "nCount_RNA")
+
+# Normalize the data using LogNormalize
+DefaultAssay(mergeAll) <- "RNA"
+mergeAll <- NormalizeData(mergeAll, normalization.method = "LogNormalize", scale.factor = 10000)
+
+# Identify variable features
+mergeAll <- FindVariableFeatures(mergeAll, selection.method = "vst", nfeatures = 3000)
+
+# Scale the data using the variable features
+mergeAll <- ScaleData(mergeAll, features = VariableFeatures(mergeAll))
+
+# Run PCA using the variable features
+mergeAll <- RunPCA(mergeAll, npcs = 30)
+
+# Run downstream analysis (neighbors, clustering, UMAP)
+mergeAll <- FindNeighbors(mergeAll, dims = 1:20)
+mergeAll <- FindClusters(mergeAll, resolution = 0.5)
+mergeAll <- RunUMAP(mergeAll, dims = 1:23) #23
+
+# Visualize the results for all RVs (groups)
+DimPlot(mergeAll, reduction = "umap", group.by = "RV") + scale_x_reverse() + scale_y_reverse() # Group by RV to ensure all groups are shown
+```
+FeaturePlot(mergeAll, c("P2ry12", "Aldh1l1","Lamp5", "Sst", "Pvalb"), max.cutoff = 1.5,reduction = "umap")
+
+
+```{r}
+###order samples 
+mergeAll$RV <- factor(mergeAll$RV,levels=c("Control","Bcl2" ,"Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2", "Ascl1SA6Dlx2", "Ascl1WTSA6", "Ascl1WTDlx2", "Ascl1SA6Dlx2_2", "Ascl1SA6Bcl2_mat", "Ascl1SA6Dlx2_mat"))
+```
+
+
+```{r}
+saveRDS(mergeAll, "/2wpi_merged_logNorm.rds")
+```
+

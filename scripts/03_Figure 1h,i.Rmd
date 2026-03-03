@@ -1,0 +1,629 @@
+---
+title: "Fig 2"
+output: html_document
+date: "2025-10-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, message=FALSE, warning=FALSE, include=FALSE}
+library(Seurat)
+library(SeuratDisk)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(tidyverse)
+library(RColorBrewer)
+library(dittoSeq)
+library(Nebulosa)
+library(dplyr)
+library(magrittr)
+library(patchwork)
+library(scCustomize)
+library(qs)
+library(viridis)
+library(dittoSeq)
+library(slingshot)
+library(ggplot2)
+library(Seurat)
+library(viridis)
+library(ggpubr)
+library(stringr)
+```
+
+```{r}
+DimPlot(subset(mergeAll_5), group.by="RV", pt.size=0.5, cols=c("black","#1E90FF","turquoise","#DB7093","purple")) + Blank_Theme()
+```
+
+```{r}
+library(Seurat)
+library(pheatmap)
+mergeAll_5 <- JoinLayers(mergeAll_5)
+Idents(mergeAll_5) <- "RV"
+mergeAll_5 <- ScaleData(mergeAll_5, features = rownames(mergeAll_5))
+###up gens 
+Ascl1_target_up_genes <- list(c("Adora1", "Ccdc155", "Mif4gd", "Lmnb2", "Phldb1", "Vrk1", "Ccnd1", "Actn1", "St3gal5", "Fam20c", "Acsf3", "Gpc1", "Lrp11", "Kremen1", "Ccdc134", "Smoc1", "Kcnj12", "S0pc4", "Zbtb7c", "Igsf21", "Cxcl12", "C1qtnf1", "Wscd1", "Stxbp5l", "Heg1", "Ttll11", "Prdx5", "Dpysl5", "Ralgps1", "9530077C05Rik", "Faah", "Slc17a7", "Lypd1", "Rgs16","Gse1", "Atoh8", "Olfml2b", "Tspan14", "Foxo6", "Bat2l", "Lima1", "Neurl1a", "Ralgds", "Coro2b", "Pvalb", "Nbl1", "Tmtc4", "Hes6", "Bag5", "Numa1", "Rassf4", "Grasp", "Exoc7", "Inpp5a", "Hdac11", "Cyb561d1", "Cdkn1c", "Fam110a", "Dapk1", "Cdh22", "Plx02", "Pde2a", "Cmpk2", "Hipk2", "Wnk2", "Tex14", "Cited4", "Shf", "Ank", "Sertad1", "Mgll", "Tha1", "Sez6l", "Gdpd1", "Dll1", "Bcl6", "Trit1", "Zdhhc14", "Ddit4", "Gramd1b", "Lm0", "Hook2", "Ninl", "Esyt3", "Tmem229b", "Frmd6", "Stxbp1", "4933426M11Rik", "Slc1a2", "Slc7a5", "1700028N14Rik", "Dgkz", "Actn4", "Neu4", "Midn", "Med27", "Pgs1", "Pip4k2a", "Gadd45g", "Parm1", "Ttc33", "Id2", "Sel1l3", "ENSMUSG00000036817", "BC029214", "Hs3st3a1", "B4galt7", "Dlx3", "Lpin1", "Col16a1", "Mapkapk2", "Rgs8", "Spnb1", "Lrig1", "Olfm1", "Zmiz2", "Gpsm1", "Camk2n1", "Dusp10", "Anks6", "BC017612", "Wbp7", "Ephb2", "Galntl4", "Cyth1", "Zc3h3", "Anxa2", "Klhl21", "1810020D17Rik", "Nxn", "Zfp521", "Amigo1", "Il6ra", "Pxn", "Dusp15", "Vps33a", "Sftpc", "Trp53i11", "Kcnip3", "Plcl2", "Gatsl2", "Aagab", "Hpcal1","Neurod4", "Zfp238", "Fbxw7", "Cbfa2t3", "Tprn", "Plk3", "Mapk8ip1", "8430427H17Rik", "Dll3", "Arc", "Rbm38", "Btg1", "Opalin", "Ptprs", "Tmem2", "Rcor2", "Arhgap24", "Ppp1r13b", "Rgma", "Svil", "Slain1", "Btbd11", "Accn2", "Tmsb10", "Prox1", "Sema6b", "Podxl2", "Ssbp3", "Pde1b", "Shisa2", "Sh3kbp1", "Ngfr", "Id1", "Auts2", "Lhx1", "Nrarp", "Tox3", "L3mbtl3", "Myt1", "Rdh5", "Hbp1", "Pard6g", "Ncoa1", "Kdm4b", "Dpysl4", "Unc79", "Casp6", "Bcl2l11", "Pcdh10", "Abtb1", "Mcf2l", "Dock4", "Lmo3", "Socs3", "D930015E06Rik", "Pkia", "Ccpg1", "Rhbdl3", "Slc12a6", "Gprin1", "Rnf114", "Art3", "Zfhx2", "Dlgap4", "Peli2", "Palm", "Myl12b", "Enox1", "Agpat4", "Cnot6l", "Grid2", "BC031353", "Megf11", "Tbc1d9", "Sbk1", "Mapt", "Jund", "Nub1", "Runx1t1", "Hes5", "Eepd1", "Iqgap2", "Rab2a", "Myh10", "Atp6v0d1", "Cbfa2t2", "Syt9", "Bahcc1", "Slc39a11", "Kalrn", "Slc35f1", "Akt3", "E2f1", "Bcl2l1", "Bcar1", "Tmod1", "Mtap1b", "Tecta", "Zfp532", "Chgb", "Gamt", "Nin", "Ralgps2", "Nfix", "Nrxn3", "Gdpd5", "Apba2", "Syt11", "Fam78b", "Dclk2", "Epha3", "D0H4S114", "Lhfpl2", "Robo1", "Rab6b", "Igsf3", "Myo6", "D11Bwg0517e", "Zfp423", "Ubl7", "Dcx", "Atp2b2", "Lmo2", "Ppp2r2b", "Sema7a", "Nol4", "Septin-5", "Mdga1", "Mbd5", "Elavl4", "Pou4f1", "Rasl11b", "Ntm", "Dyrk1b", "Kdm6b", "Limk1", "Rbm9", "Pkdcc", "Nfkbia", "Ef05", "Tubb2a", "Rhebl1", "Ecel1", "Igfbpl1", "Phc2", "Nln", "Spire2", "Hey1", "Apcdd1", "Tubb2b", "Trim46", "Gri0", "Myl1", "A2bp1", "Cxcr4", "Slc29a4", "Pfkfb4", "BC018242", "Mllt3", "Rab11fip5", "Tnnt1", "Klc1", "Bcl11b", "Lrrn3", "Nicn1", "Acvr2b", "Sema3f", "1110003E01Rik", "Elavl3"))  # List of vectors of genes
+names(Ascl1_target_up_genes) <- c("Ascl1_target_up_genes")  # Name gene sets
+###DOWN genes
+Ascl1_target_down_genes <- list(c("Prr18", "Ank2", "Ascl1", "Pipox", "Fcho1", "Lifr", "Abcb9", "Plcd4", "Pros1", "Ppp2r5a", "Nr2f6", "Nwd1", "Sall3", "Jam2", "Rab17", "Rapgef3", "Xkr9", "4933428G20Rik", "Hectd2", "Plk2", "Adora2b", "Oxr1", "Diras2", "Map4k4", "Usp2", "Thrsp", "Tsc22d3", "Il17d", "Rprml", "Lhfp", "Cx3cl1", "Acsl3", "Zdhhc9", "Fam13c", "Prickle1", "Fkbp2", "Vav3", "Mpdz", "Kcnk5", "Car3", "Nprl3", "Plekhb1", "Zfp710", "Triobp", "Cdc42ep2", "Esrrb", "Camk1g", "Tle4", "Odz4", "Megf10", "Pitpnc1", "Stk24", "Tcf7l2", "Apoc1", "Aspdh", "Spata6", "Nes", "Igfbp3", "Ets1", "Zfp704", "Slc35b4", "Vash1", "Skil", "Wnt7b", "Hdac7", "Vldlr", "Tgfbr2", "Tsc22d2", "Vps37b", "Sema6d", "Trib2", "Inhbb", "Sema4b", "Slc1a3", "Wwc1", "Ctnnd2", "Fgf1", "Tmc7", "Tsc22d4", "Ppapdc1a", "Pld1", "Dusp1", "Aacs", "AI646023", "Nfat5", "Pou3f1", "Rnf182", "Fgf12", "Rfx2", "Stard4", "Traf3", "Slc25a18", "Mapre2", "Lasp1", "Aatk", "Dtx4", "Traf3ip2", "Ascc2", "G0s2", "Tmem20", "Ccdc136", "Gas7", "Olig2", "Slc29a1", "Cspg5", "1500015O10Rik", "Alg8", "Sipa1l1", "Mtss1", "Ubxn8", "Fbln2", "Lrrn2", "Ptgds", "Capzb", "Nup210", "Vstm2b", "Cd276", "Tbc1d1", "Igfbp2", "ENSMUSG00000054863", "Aif1l", "Josd2", "Rsad2", "Arhgap8", "Srl", "Sdpr", "Kcnk1", "Camk2b", "Rrbp1", "Tle6", "Ak1", "Rab27b", "Slc12a2", "Plxnb3", "Alg10b", "4930572J05Rik", "Bag3", "Cdc25b", "Galk1", "Ssbp4", "Lrp4", "Lrrfip1", "Pmf1", "Lgals1"))  # List of vectors of genes
+names(Ascl1_target_down_genes) <- c("Ascl1_target_down_genes")  # Name gene sets
+
+# Add module scores to the Seurat object
+mergeAll_5 <- AddModuleScore(object = mergeAll_5, features = Ascl1_target_up_genes, ctrl = 5, name = 'Ascl1_target_up_genes')
+mergeAll_5 <- AddModuleScore(object = mergeAll_5, features = Ascl1_target_down_genes, ctrl = 5, name = 'Ascl1_target_down_genes')
+
+FeaturePlot(subset(mergeAll_5, subset = !(cell.type %in% c("Oligodendrocytes", "Microglia", "Pericytes"))), features = "Ascl1_target_up_genes1") & scale_colour_gradientn(colours = rev(brewer.pal(11, "RdBu"))) & Blank_Theme()
+FeaturePlot(subset(mergeAll_5, subset = !(cell.type %in% c("Oligodendrocytes", "Microglia", "Pericytes"))), features = "Ascl1_target_down_genes1") & scale_colour_gradientn(colours = rev(brewer.pal(11, "RdBu"))) & Blank_Theme()
+
+```
+
+
+```{r}
+A2N_5 <- subset(mergeAll_5, subset = cell.type %in% c("Astro-L", "Interm-1", "E-Neuronal", "Cycling_Astro",  "Astrocytes", "Adv-Neuronal-1"))
+A2N_5 <- JoinLayers(A2N_5)
+O2N_5 <- subset(mergeAll_5, subset = cell.type %in% c(  "Cycling_OPCs", "OPCs", "Interm-2", "Adv-Neuronal-2"))
+O2N_5 <- JoinLayers(O2N_5)
+A2N_5 <- ScaleData(A2N_5, features = rownames(A2N_5))
+O2N_5 <- ScaleData(O2N_5, features = rownames(O2N_5))
+```
+
+```{r}
+# Combine the Seurat objects A2N_5 and O2N_sub into a new object called G2N
+DefaultAssay(A2N_5) <- "RNA"
+DefaultAssay(O2N_5) <- "RNA"
+common_genes <- intersect(rownames(A2N_5), rownames(O2N_5))
+A2N_5 <- subset(A2N_5, features = common_genes)
+O2N_5 <- subset(O2N_5, features = common_genes)
+G2N <- merge(A2N_5, y = O2N_5, add.cell.ids = c("O2N","A2N"), project = "G2N_Project")
+G2N$Glia <- ifelse(grepl("^A2N_", colnames(G2N)),  "O2N","A2N")
+G2N$Glia <- factor(G2N$Glia, levels = c("O2N", "A2N"))
+Idents(G2N) <- "RV"
+G2N$RV <- factor(G2N$RV, levels = c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6","Ascl1SA6Bcl2"))
+G2N <- JoinLayers(G2N)
+```
+
+
+### Boxplots normalised Ascl1 targets up and down genes for  Fig 2b/c
+```{r}
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(ggpubr)
+library(rstatix)
+
+plot_df <- G2N@meta.data %>%
+  dplyr::select(Glia, RV, Ascl1_target_up_genes1, Ascl1_target_down_genes1) %>%
+  na.omit()
+
+norm_score <- function(df, col) {
+  df %>% group_by(Glia, RV) %>%
+    mutate(mean_score = mean(.data[[col]], na.rm=TRUE)) %>%
+    group_by(Glia) %>%
+    mutate(norm = .data[[col]] - mean(mean_score[RV == "Control"], na.rm=TRUE)) %>%
+    ungroup() %>% pull(norm)
+}
+
+plot_df <- plot_df %>%
+  mutate(norm_up = norm_score(., "Ascl1_target_up_genes1"),
+         norm_down = norm_score(., "Ascl1_target_down_genes1"))
+
+p1 <- ggplot(plot_df, aes(Glia, norm_up, fill=RV)) +
+  geom_boxplot(position=position_dodge(0.8)) +
+  geom_hline(yintercept=0, linetype="dotted", color="grey50") +
+  facet_wrap(~RV, nrow=1) +
+  scale_fill_manual(values=c("#808080","#1E90FF","turquoise","#DB7093","#9400D3")) +
+  stat_compare_means(aes(group=Glia), method="wilcox.test", label="p.signif", size=6, vjust=1) +
+  theme_bw() + theme(panel.grid=element_blank()) +
+  labs(title="Ascl1 target UP module", y="Normalized Module score", x="Glia")
+
+p2 <- ggplot(plot_df, aes(Glia, norm_down, fill=RV)) +
+  geom_boxplot(position=position_dodge(0.8)) +
+  geom_hline(yintercept=0, linetype="dotted", color="grey50") +
+  facet_wrap(~RV, nrow=1) +
+  scale_fill_manual(values=c("#808080","#1E90FF","turquoise","#DB7093","#9400D3")) +
+  stat_compare_means(aes(group=Glia), method="wilcox.test", label="p.signif", size=6, vjust=1) +
+  theme_bw() + theme(panel.grid=element_blank()) +
+  labs(title="Ascl1 target DOWN module", y="Normalized Module score", x="Glia")
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+get_norm_stats <- function(df, norm_col) {
+  df %>%
+    filter(RV != "Control") %>%   # Control = 0 by definition
+    group_by(RV) %>%
+    wilcox_test(as.formula(paste(norm_col, "~ Glia")), p.adjust.method = "none") %>%
+    add_significance("p") %>%
+    ungroup()
+}
+
+norm_up_stats <- get_norm_stats(plot_df, "norm_up")
+norm_down_stats <- get_norm_stats(plot_df, "norm_down")
+
+summary_stats <- bind_rows(
+  norm_up_stats %>% mutate(Module = "UP"),
+  norm_down_stats %>% mutate(Module = "DOWN")
+) %>%
+  select(Module, RV, group1, group2, statistic, p, p.signif)
+
+write.csv(summary_stats,
+          "/Users/alexiscooper/The Francis Crick Dropbox/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/Tables/Ascl1_module_score_summary_with_pval.csv",
+          row.names = FALSE)
+
+# Print table in console
+print(summary_stats)
+
+```
+
+
+###stats and module score values in xls  for  Fig 2b/c
+```{r}
+library(dplyr)
+plot_df <- G2N@meta.data %>%
+  dplyr::select(Glia, RV, Ascl1_target_up_genes1, Ascl1_target_down_genes1) %>%
+  na.omit()
+
+fmt <- function(p) paste0(symnum(p, c(0,.001,.01,.05,.1,1), c("****","***","**","*","ns")), "\n", formatC(p, format="e", digits=2))
+plot_df %>%
+  group_by(RV, Glia) %>%
+  summarise(across(c(Ascl1_target_up_genes1, Ascl1_target_down_genes1), list(mean = ~mean(.x, na.rm=TRUE), sd = ~sd(.x, na.rm=TRUE))), n=n(), .groups="drop") %>%
+  left_join(plot_df %>% group_by(RV) %>% summarise(p_up = wilcox.test(Ascl1_target_up_genes1 ~ Glia)$p.value, label_up = fmt(p_up)), by="RV") %>%
+  left_join(plot_df %>% group_by(RV) %>% summarise(p_down = wilcox.test(Ascl1_target_down_genes1 ~ Glia)$p.value, label_down = fmt(p_down)), by="RV") %>%
+  write.csv("/Users/alexiscooper/The Francis Crick Dropbox/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/Tables/Ascl1_module_score_summary_with_pval.csv", row.names=FALSE)
+
+```
+
+
+
+
+```{r Ascl1 target genes, warning = FALSE, message = FALSE, fig.width=12, fig.height=5 }
+library(patchwork)
+
+cluster1_features <- list(c("Adora1", "Ccdc155", "Mif4gd", "Lmnb2", "Phldb1", "Vrk1", "Ccnd1", "Actn1", "St3gal5", "Fam20c", "Acsf3", "Gpc1", "Lrp11", "Kremen1", "Ccdc134", "Smoc1", "Kcnj12", "S0pc4", "Zbtb7c", "Igsf21", "Cxcl12", "C1qtnf1", "Wscd1", "Stxbp5l", "Heg1", "Ttll11", "Prdx5", "Dpysl5", "Ralgps1", "9530077C05Rik", "Faah", "Slc17a7", "Lypd1", "Rgs16"))
+##S0pc4,
+
+cluster2_features <- list(c("Rgs16","Gse1", "Atoh8", "Olfml2b", "Tspan14", "Foxo6", "Bat2l", "Lima1", "Neurl1a", "Ralgds", "Coro2b", "Pvalb", "Nbl1", "Tmtc4", "Hes6", "Bag5", "Numa1", "Rassf4", "Grasp", "Exoc7", "Inpp5a", "Hdac11", "Cyb561d1", "Cdkn1c", "Fam110a", "Dapk1", "Cdh22", "Plx02", "Pde2a", "Cmpk2", "Hipk2", "Wnk2", "Tex14", "Cited4", "Shf", "Ank", "Sertad1", "Mgll", "Tha1", "Sez6l", "Gdpd1", "Dll1", "Bcl6", "Trit1", "Zdhhc14", "Ddit4", "Gramd1b", "Lm0", "Hook2", "Ninl", "Esyt3", "Tmem229b", "Frmd6", "Stxbp1", "4933426M11Rik", "Slc1a2", "Slc7a5", "1700028N14Rik", "Dgkz", "Actn4", "Neu4", "Midn", "Med27", "Pgs1", "Pip4k2a", "Gadd45g", "Parm1", "Ttc33", "Id2", "Sel1l3", "ENSMUSG00000036817", "BC029214", "Hs3st3a1", "B4galt7", "Dlx3", "Lpin1", "Col16a1", "Mapkapk2", "Rgs8", "Spnb1", "Lrig1", "Olfm1", "Zmiz2", "Gpsm1", "Camk2n1", "Dusp10", "Anks6", "BC017612", "Wbp7", "Ephb2", "Galntl4", "Cyth1", "Zc3h3", "Anxa2", "Klhl21", "1810020D17Rik", "Nxn", "Zfp521", "Amigo1", "Il6ra", "Pxn", "Dusp15", "Vps33a", "Sftpc", "Trp53i11", "Kcnip3", "Plcl2", "Gatsl2", "Aagab", "Hpcal1"))
+###no Bat2l, Plx02, Lm0, 4933426M11Rik, ENSMUSG00000036817, BC029214, Spnb1, BC017612, Wbp7, Galntl4, 1810020D17Rik, Gatsl2
+
+cluster3_features <- list(c("Neurod4", "Zfp238", "Fbxw7", "Cbfa2t3", "Tprn", "Plk3", "Mapk8ip1", "8430427H17Rik", "Dll3", "Arc", "Rbm38", "Btg1", "Opalin", "Ptprs", "Tmem2", "Rcor2", "Arhgap24", "Ppp1r13b", "Rgma", "Svil", "Slain1", "Btbd11", "Accn2", "Tmsb10", "Prox1", "Sema6b", "Podxl2", "Ssbp3", "Pde1b", "Shisa2", "Sh3kbp1", "Ngfr", "Id1", "Auts2", "Lhx1", "Nrarp", "Tox3", "L3mbtl3", "Myt1", "Rdh5", "Hbp1", "Pard6g", "Ncoa1", "Kdm4b", "Dpysl4", "Unc79", "Casp6", "Bcl2l11", "Pcdh10", "Abtb1", "Mcf2l", "Dock4", "Lmo3", "Socs3", "D930015E06Rik", "Pkia", "Ccpg1", "Rhbdl3", "Slc12a6", "Gprin1", "Rnf114", "Art3", "Zfhx2", "Dlgap4", "Peli2", "Palm", "Myl12b", "Enox1", "Agpat4", "Cnot6l", "Grid2", "BC031353", "Megf11", "Tbc1d9", "Sbk1", "Mapt", "Jund", "Nub1", "Runx1t1", "Hes5", "Eepd1", "Iqgap2", "Rab2a", "Myh10", "Atp6v0d1", "Cbfa2t2", "Syt9"))
+###no Zfp238, 8430427H17Rik, Tmem2, Accn2, D930015E06Rik, BC031353
+
+cluster4_features <- list(c("Bahcc1", "Slc39a11", "Kalrn", "Slc35f1", "Akt3", "E2f1", "Bcl2l1", "Bcar1", "Tmod1", "Mtap1b", "Tecta", "Zfp532", "Chgb", "Gamt", "Nin", "Ralgps2", "Nfix", "Nrxn3", "Gdpd5", "Apba2", "Syt11", "Fam78b", "Dclk2", "Epha3", "D0H4S114", "Lhfpl2", "Robo1", "Rab6b", "Igsf3", "Myo6", "D11Bwg0517e", "Zfp423", "Ubl7", "Dcx", "Atp2b2", "Lmo2", "Ppp2r2b", "Sema7a", "Nol4", "Septin-5", "Mdga1", "Mbd5", "Elavl4", "Pou4f1", "Rasl11b", "Ntm", "Dyrk1b", "Kdm6b", "Limk1", "Rbm9", "Pkdcc", "Nfkbia", "Ef05", "Tubb2a", "Rhebl1", "Ecel1", "Igfbpl1", "Phc2", "Nln", "Spire2", "Hey1", "Apcdd1", "Tubb2b", "Trim46", "Gri0", "Myl1", "A2bp1", "Cxcr4", "Slc29a4", "Pfkfb4", "BC018242", "Mllt3", "Rab11fip5", "Tnnt1", "Klc1", "Bcl11b", "Lrrn3", "Nicn1", "Acvr2b", "Sema3f", "1110003E01Rik", "Elavl3"))
+###Mtap1b, D0H4S114, D11Bwg0517e, Septin-5, Rbm9, Ef05, Gri0, A2bp1, BC018242, 1110003E01Rik
+
+###down regulated 
+cluster5_features <- list(c("Prr18", "Ank2", "Ascl1", "Pipox", "Fcho1", "Lifr", "Abcb9", "Plcd4", "Pros1", "Ppp2r5a", "Nr2f6", "Nwd1", "Sall3", "Jam2", "Rab17", "Rapgef3", "Xkr9", "4933428G20Rik", "Hectd2", "Plk2", "Adora2b", "Oxr1", "Diras2", "Map4k4", "Usp2", "Thrsp", "Tsc22d3", "Il17d", "Rprml", "Lhfp", "Cx3cl1", "Acsl3", "Zdhhc9", "Fam13c", "Prickle1", "Fkbp2", "Vav3", "Mpdz", "Kcnk5", "Car3", "Nprl3", "Plekhb1", "Zfp710", "Triobp", "Cdc42ep2", "Esrrb", "Camk1g", "Tle4", "Odz4", "Megf10", "Pitpnc1", "Stk24", "Tcf7l2", "Apoc1", "Aspdh", "Spata6", "Nes", "Igfbp3", "Ets1", "Zfp704", "Slc35b4", "Vash1"))
+###no Odz4
+cluster6_features <- list(c("Skil", "Wnt7b", "Hdac7", "Vldlr", "Tgfbr2", "Tsc22d2", "Vps37b", "Sema6d", "Trib2", "Inhbb", "Sema4b", "Slc1a3", "Wwc1", "Ctnnd2", "Fgf1", "Tmc7", "Tsc22d4", "Ppapdc1a", "Pld1", "Dusp1", "Aacs", "AI646023", "Nfat5", "Pou3f1", "Rnf182", "Fgf12", "Rfx2", "Stard4", "Traf3", "Slc25a18", "Mapre2", "Lasp1", "Aatk", "Dtx4"))
+## No Ppapdc1a, AI646023
+
+cluster7_features <- list(c("Traf3ip2", "Ascc2", "G0s2", "Tmem20", "Ccdc136", "Gas7", "Olig2", "Slc29a1", "Cspg5", "1500015O10Rik", "Alg8", "Sipa1l1", "Mtss1", "Ubxn8", "Fbln2", "Lrrn2", "Ptgds", "Capzb", "Nup210", "Vstm2b", "Cd276", "Tbc1d1", "Igfbp2", "ENSMUSG00000054863", "Aif1l", "Josd2", "Rsad2", "Arhgap8", "Srl", "Sdpr", "Kcnk1", "Camk2b", "Rrbp1", "Tle6", "Ak1", "Rab27b", "Slc12a2", "Plxnb3", "Alg10b", "4930572J05Rik", "Bag3", "Cdc25b", "Galk1", "Ssbp4", "Lrp4", "Lrrfip1", "Pmf1", "Lgals1"))
+###Tmem20, 1500015O10Rik, ENSMUSG00000054863, Sdpr, 4930572J05Rik
+
+mergeAll_5 <- AddModuleScore(object = mergeAll_5, features = cluster1_features, ctrl = 5, name = 'Ascl1_targets_cluster1_features')
+mergeAll_5 <- AddModuleScore(object = mergeAll_5, features = cluster2_features, ctrl = 5, name = 'Ascl1_targets_cluster2_features')
+mergeAll_5 <- AddModuleScore(object = mergeAll_5, features = cluster3_features, ctrl = 5, name = 'Ascl1_targets_cluster3_features')
+mergeAll_5 <- AddModuleScore(object = mergeAll_5, features = cluster4_features, ctrl = 5, name = 'Ascl1_targets_cluster4_features')
+mergeAll_5 <- AddModuleScore(object = mergeAll_5, features = cluster5_features, ctrl = 5, name = 'Ascl1_targets_cluster5_features')
+mergeAll_5 <- AddModuleScore(object = mergeAll_5, features = cluster6_features, ctrl = 5, name = 'Ascl1_targets_cluster6_features')
+mergeAll_5 <- AddModuleScore(object = mergeAll_5, features = cluster7_features, ctrl = 5, name = 'Ascl1_targets_cluster7_features')
+
+## Figure 2d
+wrap_plots(lapply(c(3, 4, 5, 7), function(i) FeaturePlot(subset(mergeAll_5, subset = !(cell.type %in% c("Oligodendrocytes", "Microglia", "Pericytes"))), features = paste0("Ascl1_targets_cluster", i, "_features1")) & scale_colour_gradientn(colours = rev(brewer.pal(11, "RdBu"))) & Blank_Theme()), ncol = 2)
+```
+
+
+
+
+
+
+
+###compare between RVs significants for Extended Data: Fig 4b
+
+```{r}
+library(ggplot2)
+library(ggpattern)
+library(dplyr)
+library(rstatix)
+library(ggpubr)
+
+# Prepare data
+plot_df <- G2N@meta.data %>%
+  dplyr::select(Glia, RV, Ascl1_target_up_genes1, Ascl1_target_down_genes1) %>%
+  na.omit() %>%
+  mutate(RV_group = case_when(
+    RV %in% c("Ascl1WT", "Ascl1WTBcl2") ~ "Ascl1WT_combined",
+    RV %in% c("Ascl1SA6", "Ascl1SA6Bcl2") ~ "Ascl1SA6_combined",
+    TRUE ~ RV
+  ),
+  RV_group = factor(RV_group, levels = c("Control", "Ascl1WT_combined", "Ascl1SA6_combined"))
+  )
+
+# Function to compute pairwise Wilcoxon and add stars
+get_pvals <- function(df, gene_col){
+  df %>%
+    pairwise_wilcox_test(as.formula(paste0(gene_col, " ~ RV_group")), p.adjust.method = "BH") %>%
+    filter(group1 != group2) %>%
+    mutate(
+      stars = case_when(
+        p.adj <= 0.001 ~ "****",
+        p.adj <= 0.01  ~ "***",
+        p.adj <= 0.05  ~ "**",
+        p.adj <= 0.1   ~ "*",
+        TRUE           ~ "ns"
+      ),
+      y.position = max(df[[gene_col]]) * 1.05
+    )
+}
+
+pvals_up <- get_pvals(plot_df, "Ascl1_target_up_genes1")
+pvals_down <- get_pvals(plot_df, "Ascl1_target_down_genes1")
+
+# Plot function for striped boxes
+plot_module <- function(gene_col, title, pvals){
+  ggplot(plot_df, aes(x = RV_group, y = .data[[gene_col]])) +
+    geom_boxplot_pattern(
+      pattern = c("none", "stripe", "stripe"),
+      pattern_fill = c(NA, "#1E90FF", "#DB7093"),
+      pattern_color = c(NA, "turquoise", "#9400D3"),
+      pattern_angle = 45,
+      pattern_density = 0.5,
+      pattern_spacing = 0.02,
+      fill = c("#808080", NA, NA),
+      color = "black"
+    ) +
+    geom_hline(yintercept = 0, linetype = "dotted", color = "grey50") +
+    stat_pvalue_manual(pvals, label = "stars", tip.length = 0.03) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = title, y = "Module score", x = "RV group")
+}
+
+p1 <- plot_module("Ascl1_target_up_genes1", "Ascl1 target UP module", pvals_up)
+p2 <- plot_module("Ascl1_target_down_genes1", "Ascl1 target DOWN module", pvals_down)
+
+# Combine plots
+ggpubr::ggarrange(p1, p2, ncol = 2, common.legend = TRUE)
+library(dplyr)
+library(rstatix)
+
+```
+
+###STATS compare between RVs significantsfor Extended Data: Fig 4b
+```{r}
+library(dplyr)
+library(rstatix)
+
+# Create RV_group and ensure it's a factor
+plot_df <- G2N@meta.data %>%
+  dplyr::select(Glia, RV, Ascl1_target_up_genes1, Ascl1_target_down_genes1) %>%
+  na.omit() %>%
+  mutate(
+    RV_group = case_when(
+      RV %in% c("Ascl1WT", "Ascl1WTBcl2") ~ "Ascl1WT_combined",
+      RV %in% c("Ascl1SA6", "Ascl1SA6Bcl2") ~ "Ascl1SA6_combined",
+      TRUE ~ RV
+    ),
+    RV_group = factor(RV_group, levels = c("Control", "Ascl1WT_combined", "Ascl1SA6_combined"))
+  )
+
+# Pairwise Wilcoxon test
+pval_df <- plot_df %>%
+  pairwise_wilcox_test(
+    Ascl1_target_up_genes1 ~ RV_group,
+    p.adjust.method = "BH"
+  ) %>%
+  mutate(
+    stars = case_when(
+      p.adj <= 0.001 ~ "****",
+      p.adj <= 0.01  ~ "***",
+      p.adj <= 0.05  ~ "**",
+      p.adj <= 0.1   ~ "*",
+      TRUE           ~ "ns"
+    ),
+    # Use format.pval to show very small p-values instead of 0
+    label = paste0(stars, "\n", format.pval(p.adj, digits = 3, scientific = TRUE, eps = .Machine$double.eps))
+  )
+
+# Print table
+print(pval_df %>% select(group1, group2, p, p.adj, stars, label))
+
+```
+
+
+
+
+### Boxplots non-normalised Ascl1 targets up and down genes for Extended Data: Fig 4c
+
+```{r}
+library(Seurat)
+library(pheatmap)
+library(SCpubr)
+library(ggplot2)
+library(gridExtra)
+
+###up genes
+up_features <- list(c("Adora1", "Ccdc155", "Mif4gd", "Lmnb2", "Phldb1", "Vrk1", "Ccnd1", "Actn1", "St3gal5", "Fam20c", "Acsf3", "Gpc1", "Lrp11", "Kremen1", "Ccdc134", "Smoc1", "Kcnj12", "S0pc4", "Zbtb7c", "Igsf21", "Cxcl12", "C1qtnf1", "Wscd1", "Stxbp5l", "Heg1", "Ttll11", "Prdx5", "Dpysl5", "Ralgps1", "9530077C05Rik", "Faah", "Slc17a7", "Lypd1", "Rgs16","Gse1", "Atoh8", "Olfml2b", "Tspan14", "Foxo6", "Bat2l", "Lima1", "Neurl1a", "Ralgds", "Coro2b", "Pvalb", "Nbl1", "Tmtc4", "Hes6", "Bag5", "Numa1", "Rassf4", "Grasp", "Exoc7", "Inpp5a", "Hdac11", "Cyb561d1", "Cdkn1c", "Fam110a", "Dapk1", "Cdh22", "Plx02", "Pde2a", "Cmpk2", "Hipk2", "Wnk2", "Tex14", "Cited4", "Shf", "Ank", "Sertad1", "Mgll", "Tha1", "Sez6l", "Gdpd1", "Dll1", "Bcl6", "Trit1", "Zdhhc14", "Ddit4", "Gramd1b", "Lm0", "Hook2", "Ninl", "Esyt3", "Tmem229b", "Frmd6", "Stxbp1", "4933426M11Rik", "Slc1a2", "Slc7a5", "1700028N14Rik", "Dgkz", "Actn4", "Neu4", "Midn", "Med27", "Pgs1", "Pip4k2a", "Gadd45g", "Parm1", "Ttc33", "Id2", "Sel1l3", "ENSMUSG00000036817", "BC029214", "Hs3st3a1", "B4galt7", "Dlx3", "Lpin1", "Col16a1", "Mapkapk2", "Rgs8", "Spnb1", "Lrig1", "Olfm1", "Zmiz2", "Gpsm1", "Camk2n1", "Dusp10", "Anks6", "BC017612", "Wbp7", "Ephb2", "Galntl4", "Cyth1", "Zc3h3", "Anxa2", "Klhl21", "1810020D17Rik", "Nxn", "Zfp521", "Amigo1", "Il6ra", "Pxn", "Dusp15", "Vps33a", "Sftpc", "Trp53i11", "Kcnip3", "Plcl2", "Gatsl2", "Aagab", "Hpcal1","Neurod4", "Zfp238", "Fbxw7", "Cbfa2t3", "Tprn", "Plk3", "Mapk8ip1", "8430427H17Rik", "Dll3", "Arc", "Rbm38", "Btg1", "Opalin", "Ptprs", "Tmem2", "Rcor2", "Arhgap24", "Ppp1r13b", "Rgma", "Svil", "Slain1", "Btbd11", "Accn2", "Tmsb10", "Prox1", "Sema6b", "Podxl2", "Ssbp3", "Pde1b", "Shisa2", "Sh3kbp1", "Ngfr", "Id1", "Auts2", "Lhx1", "Nrarp","Rgs16", "Tox3", "L3mbtl3", "Myt1", "Rdh5", "Hbp1", "Pard6g", "Ncoa1", "Kdm4b", "Dpysl4", "Unc79", "Casp6", "Bcl2l11", "Pcdh10", "Abtb1", "Mcf2l", "Dock4", "Lmo3", "Socs3", "D930015E06Rik", "Pkia", "Ccpg1", "Rhbdl3", "Slc12a6", "Gprin1", "Rnf114", "Art3", "Zfhx2", "Dlgap4", "Peli2", "Palm", "Myl12b", "Enox1", "Agpat4", "Cnot6l", "Grid2", "BC031353", "Megf11", "Tbc1d9", "Sbk1", "Mapt", "Jund", "Nub1", "Runx1t1", "Hes5", "Eepd1", "Iqgap2", "Rab2a", "Myh10", "Atp6v0d1", "Cbfa2t2", "Syt9", "Bahcc1", "Slc39a11", "Kalrn", "Slc35f1", "Akt3", "E2f1", "Bcl2l1", "Bcar1", "Tmod1", "Mtap1b", "Tecta", "Zfp532", "Chgb", "Gamt", "Nin", "Ralgps2", "Nfix", "Nrxn3", "Gdpd5", "Apba2", "Syt11", "Fam78b", "Dclk2", "Epha3", "D0H4S114", "Lhfpl2", "Robo1", "Rab6b", "Igsf3", "Myo6", "D11Bwg0517e", "Zfp423", "Ubl7", "Dcx", "Atp2b2", "Lmo2", "Ppp2r2b", "Sema7a", "Nol4", "Septin-5", "Mdga1", "Mbd5", "Elavl4", "Pou4f1", "Rasl11b", "Ntm", "Dyrk1b", "Kdm6b", "Limk1", "Rbm9", "Pkdcc", "Nfkbia", "Ef05", "Tubb2a", "Rhebl1", "Ecel1", "Igfbpl1", "Phc2", "Nln", "Spire2", "Hey1", "Apcdd1", "Tubb2b", "Trim46", "Gri0", "Myl1", "A2bp1", "Cxcr4", "Slc29a4", "Pfkfb4", "BC018242", "Mllt3", "Rab11fip5", "Tnnt1", "Klc1", "Bcl11b", "Lrrn3", "Nicn1", "Acvr2b", "Sema3f", "1110003E01Rik", "Elavl3"))
+
+
+down_features <- list(c("Prr18", "Ank2", "Ascl1", "Pipox", "Fcho1", "Lifr", "Abcb9", "Plcd4", "Pros1", "Ppp2r5a", "Nr2f6", "Nwd1", "Sall3", "Jam2", "Rab17", "Rapgef3", "Xkr9", "4933428G20Rik", "Hectd2", "Plk2", "Adora2b", "Oxr1", "Diras2", "Map4k4", "Usp2", "Thrsp", "Tsc22d3", "Il17d", "Rprml", "Lhfp", "Cx3cl1", "Acsl3", "Zdhhc9", "Fam13c", "Prickle1", "Fkbp2", "Vav3", "Mpdz", "Kcnk5", "Car3", "Nprl3", "Plekhb1", "Zfp710", "Triobp", "Cdc42ep2", "Esrrb", "Camk1g", "Tle4", "Odz4", "Megf10", "Pitpnc1", "Stk24", "Tcf7l2", "Apoc1", "Aspdh", "Spata6", "Nes", "Igfbp3", "Ets1", "Zfp704", "Slc35b4", "Vash1", "Skil", "Wnt7b", "Hdac7", "Vldlr", "Tgfbr2", "Tsc22d2", "Vps37b", "Sema6d", "Trib2", "Inhbb", "Sema4b", "Slc1a3", "Wwc1", "Ctnnd2", "Fgf1", "Tmc7", "Tsc22d4", "Ppapdc1a", "Pld1", "Dusp1", "Aacs", "AI646023", "Nfat5", "Pou3f1", "Rnf182", "Fgf12", "Rfx2", "Stard4", "Traf3", "Slc25a18", "Mapre2", "Lasp1", "Aatk", "Dtx4", "Traf3ip2", "Ascc2", "G0s2", "Tmem20", "Ccdc136", "Gas7", "Olig2", "Slc29a1", "Cspg5", "1500015O10Rik", "Alg8", "Sipa1l1", "Mtss1", "Ubxn8", "Fbln2", "Lrrn2", "Ptgds", "Capzb", "Nup210", "Vstm2b", "Cd276", "Tbc1d1", "Igfbp2", "ENSMUSG00000054863", "Aif1l", "Josd2", "Rsad2", "Arhgap8", "Srl", "Sdpr", "Kcnk1", "Camk2b", "Rrbp1", "Tle6", "Ak1", "Rab27b", "Slc12a2", "Plxnb3", "Alg10b", "4930572J05Rik", "Bag3", "Cdc25b", "Galk1", "Ssbp4", "Lrp4", "Lrrfip1", "Pmf1", "Lgals1")) 
+names(up_features) <- c("Ascl1_target_up_genes") 
+
+names(down_features) <- c("Ascl1_target_down_genes") 
+G2N <- Seurat::AddModuleScore(object = G2N,features = up_features,name = paste0(names(up_features)))
+G2N <- Seurat::AddModuleScore(object = G2N,features = down_features,name = paste0(names(down_features)))
+boxplot_obj <- SCpubr::do_BoxPlot(sample = G2N, feature = "Ascl1_target_up_genes1", split.by = "Glia")
+boxplot_obj2 <- SCpubr::do_BoxPlot(sample = G2N, feature = "Ascl1_target_down_genes1", split.by = "Glia")
+Idents(G2N) <- "Glia"
+boxplot_obj <- SCpubr::do_BoxPlot(sample = G2N, feature = "Ascl1_target_up_genes1", split.by = "RV")
+boxplot_obj <- boxplot_obj + scale_fill_manual(values = c("#808080", "#1E90FF", "turquoise", "#DB7093", "#9400D3"))
+boxplot_obj2 <- SCpubr::do_BoxPlot(sample = G2N, feature = "Ascl1_target_down_genes1", split.by = "RV")
+boxplot_obj2 <- boxplot_obj2 + scale_fill_manual(values = c("#808080", "#1E90FF", "turquoise", "#DB7093", "#9400D3"))
+grid.arrange(boxplot_obj, boxplot_obj2, ncol = 2)
+```
+
+####Stats for non- normalised for Extended Data: Fig 4c
+```{r}
+library(dplyr)
+get_pvals <- function(plot_df, gene_col) {
+  plot_df %>%
+    group_by(RV) %>%
+    summarise(
+      p = wilcox.test(.data[[gene_col]] ~ Glia)$p.value,
+      .groups = 'drop'
+    ) %>%
+    mutate(
+      stars = symnum(p, c(0, 0.001, 0.01, 0.05, 0.1, 1), symbols = c("****", "***", "**", "*", "ns")),
+      label = paste0(stars, "\n", formatC(p, format = "e", digits = 2)),
+      y.position = 1.1  # adjust for plotting
+    )
+}
+pval_up <- get_pvals(plot_df, "Ascl1_target_up_genes1")
+pval_down <- get_pvals(plot_df, "Ascl1_target_down_genes1")
+print(pval_up %>% select(RV, p, stars, label))
+print(pval_down %>% select(RV, p, stars, label))
+```
+
+
+### module score comparision for each cluster , non-normalised for Extended Data: Fig 4f
+```{r}
+# Add module scores
+for (i in 1:7) G2N <- AddModuleScore(G2N, features = get(paste0("cluster", i, "_features")), ctrl = 5, name = paste0("Ascl1_targets_cluster", i, "_features"))
+
+# Create and display plots
+do.call(gridExtra::grid.arrange, c(lapply(1:7, \(i) ggplot(G2N@meta.data, aes(x = Glia, y = .data[[paste0("Ascl1_targets_cluster", i, "_features1")]], fill = RV)) +
+  geom_boxplot(position = position_dodge(0.8)) +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "grey50") +
+  facet_wrap(~RV, nrow = 1) +
+  scale_fill_manual(values = c("#808080", "#1E90FF", "turquoise", "#DB7093", "#9400D3")) +
+  stat_compare_means(aes(group = Glia), method = "wilcox.test", label = "p.signif", size = 6, vjust = 1) +
+  theme_bw() + theme(panel.grid = element_blank()) +
+  labs(title = paste("Ascl1 target module", i), y = "Module score", x = "Glia")), ncol = 2))
+
+```
+
+###output file for each individual cluster with stats ### module score comparision for each cluster , non-normalised for Extended Data: Fig 4f
+```{r}
+write.csv(bind_rows(lapply(paste0("Ascl1_targets_cluster",1:7,"_features1"), function(mod) {
+  df <- G2N@meta.data %>% group_by(RV,Glia) %>% summarise(mean=mean(.data[[mod]],na.rm=TRUE), sd=sd(.data[[mod]],na.rm=TRUE), n=n(), .groups="drop")
+  pvals <- G2N@meta.data %>% group_by(RV) %>% summarise(p=wilcox.test(.data[[mod]]~Glia)$p.value, .groups="drop") %>% mutate(stars=symnum(p,c(0,.001,.01,.05,.1,1),c("****","***","**","*","ns")), label=paste0(stars,"\n",formatC(p,format="e",digits=2)))
+  left_join(df,pvals,by="RV") %>% mutate(module=sub("1$","",mod))
+})), "/Users/alexiscooper/The Francis Crick Dropbox/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/Tables/Ascl1_module_scores_stats_allclusters.csv", row.names=FALSE)
+
+```
+
+
+####normalised to Control for indiv. clusters  for Extended Data: Fig 4f
+```{r}
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(ggpubr)
+for (i in 1:7) G2N <- AddModuleScore(G2N, features = get(paste0("cluster", i, "_features")), ctrl = 5, name = paste0("Ascl1_targets_cluster", i, "_features"))
+# Normalize scores by Control mean per Glia for each module, then plot
+plots <- lapply(1:7, function(i) {
+  score_col <- paste0("Ascl1_targets_cluster", i, "_features1")
+  meta_norm <- G2N@meta.data %>%
+    group_by(Glia, RV) %>%
+    mutate(mean_score = mean(.data[[score_col]], na.rm = TRUE)) %>%
+    ungroup() %>%
+    group_by(Glia) %>%
+    mutate(control_mean = mean(mean_score[RV == "Control"], na.rm = TRUE)) %>%
+    ungroup() %>%
+    mutate(norm_score = .data[[score_col]] - control_mean)
+  ggplot(meta_norm, aes(x = Glia, y = norm_score, fill = RV)) +
+    geom_boxplot(position = position_dodge(0.8)) +
+    geom_hline(yintercept = 0, linetype = "dotted", color = "grey50") +
+    facet_wrap(~RV, nrow = 1) +
+    scale_fill_manual(values = c("#808080", "#1E90FF", "turquoise", "#DB7093", "#9400D3")) +
+    stat_compare_means(aes(group = Glia), method = "wilcox.test", label = "p.signif", size = 6, vjust = 1) +
+    theme_bw() + theme(panel.grid = element_blank()) +
+    labs(title = paste("Ascl1 target module", i), y = "Normalized Module score", x = "Glia")
+})
+do.call(gridExtra::grid.arrange, c(plots, ncol = 2))
+```
+
+
+
+
+## Extended Figure 5 a/b
+```{r}
+
+## Extended Figure 5 a
+for (i in 1:7) mergeAll_5 <- AddModuleScore(mergeAll_5, features = get(paste0("cluster", i, "_features")), ctrl = 5, name = paste0("Ascl1_targets_cluster", i, "_features"))
+wrap_plots(lapply(1:7, \(i) FeaturePlot(subset(mergeAll_5, subset = !(cell.type %in% c("Oligodendrocytes", "Microglia", "Pericytes"))), features = paste0("Ascl1_targets_cluster", i, "_features1")) & scale_colour_gradientn(colours = rev(brewer.pal(11, "RdBu"))) & Blank_Theme() & theme(text = element_text(size = 9))), ncol = 7) & theme(text = element_text(size = 9))
+
+## Extended Figure 5 b
+wrap_plots(lapply(1:7, function(i) FeaturePlot(subset(mergeAll_5, subset = !(cell.type %in% c("Oligodendrocytes", "Microglia", "Pericytes"))), features = paste0("Ascl1_targets_cluster", i, "_features1"), split.by = "RV") & scale_colour_gradientn(colours = rev(brewer.pal(11, "RdBu"))) & Blank_Theme() & theme(strip.text = element_blank())), ncol = 1)
+
+```
+
+
+## Extended Figure 6 
+```{r}
+library(Seurat)
+library(pheatmap)
+library(viridis)
+library(gridExtra)  # or patchwork
+
+G2N <- merge(A2N_5, y = O2N_5, add.cell.ids = c("O2N","A2N"), project = "G2N_Project")
+G2N$Glia <- ifelse(grepl("^A2N_", colnames(G2N)),  "O2N","A2N")
+G2N$Glia <- factor(G2N$Glia, levels = c("O2N", "A2N"))
+Idents(G2N) <- "RV"
+G2N$RV <- factor(G2N$RV, levels = c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6","Ascl1SA6Bcl2"))
+G2N <- JoinLayers(G2N)
+
+### Ascl1 direct targets with genes expression 
+cluster1_features <- list(c("Adora1", "Ccdc155", "Mif4gd", "Lmnb2", "Phldb1", "Vrk1", "Ccnd1", "Actn1", "St3gal5", "Fam20c", "Acsf3", "Gpc1", "Lrp11", "Kremen1", "Ccdc134", "Smoc1", "Kcnj12", "S0pc4", "Zbtb7c", "Igsf21", "Cxcl12", "C1qtnf1", "Wscd1", "Stxbp5l", "Heg1", "Ttll11", "Prdx5", "Dpysl5", "Ralgps1", "9530077C05Rik", "Faah", "Slc17a7", "Lypd1", "Rgs16"))
+##S0pc4,
+
+cluster2_features <- list(c("Rgs16","Gse1", "Atoh8", "Olfml2b", "Tspan14", "Foxo6", "Bat2l", "Lima1", "Neurl1a", "Ralgds", "Coro2b", "Pvalb", "Nbl1", "Tmtc4", "Hes6", "Bag5", "Numa1", "Rassf4", "Grasp", "Exoc7", "Inpp5a", "Hdac11", "Cyb561d1", "Cdkn1c", "Fam110a", "Dapk1", "Cdh22", "Plx02", "Pde2a", "Cmpk2", "Hipk2", "Wnk2", "Tex14", "Cited4", "Shf", "Ank", "Sertad1", "Mgll", "Tha1", "Sez6l", "Gdpd1", "Dll1", "Bcl6", "Trit1", "Zdhhc14", "Ddit4", "Gramd1b", "Lm0", "Hook2", "Ninl", "Esyt3", "Tmem229b", "Frmd6", "Stxbp1", "4933426M11Rik", "Slc1a2", "Slc7a5", "1700028N14Rik", "Dgkz", "Actn4", "Neu4", "Midn", "Med27", "Pgs1", "Pip4k2a", "Gadd45g", "Parm1", "Ttc33", "Id2", "Sel1l3", "ENSMUSG00000036817", "BC029214", "Hs3st3a1", "B4galt7", "Dlx3", "Lpin1", "Col16a1", "Mapkapk2", "Rgs8", "Spnb1", "Lrig1", "Olfm1", "Zmiz2", "Gpsm1", "Camk2n1", "Dusp10", "Anks6", "BC017612", "Wbp7", "Ephb2", "Galntl4", "Cyth1", "Zc3h3", "Anxa2", "Klhl21", "1810020D17Rik", "Nxn", "Zfp521", "Amigo1", "Il6ra", "Pxn", "Dusp15", "Vps33a", "Sftpc", "Trp53i11", "Kcnip3", "Plcl2", "Gatsl2", "Aagab", "Hpcal1"))
+###no Bat2l, Plx02, Lm0, 4933426M11Rik, ENSMUSG00000036817, BC029214, Spnb1, BC017612, Wbp7, Galntl4, 1810020D17Rik, Gatsl2
+
+cluster3_features <- list(c("Neurod4", "Zfp238", "Fbxw7", "Cbfa2t3", "Tprn", "Plk3", "Mapk8ip1", "8430427H17Rik", "Dll3", "Arc", "Rbm38", "Btg1", "Opalin", "Ptprs", "Tmem2", "Rcor2", "Arhgap24", "Ppp1r13b", "Rgma", "Svil", "Slain1", "Btbd11", "Accn2", "Tmsb10", "Prox1", "Sema6b", "Podxl2", "Ssbp3", "Pde1b", "Shisa2", "Sh3kbp1", "Ngfr", "Id1", "Auts2", "Lhx1", "Nrarp", "Tox3", "L3mbtl3", "Myt1", "Rdh5", "Hbp1", "Pard6g", "Ncoa1", "Kdm4b", "Dpysl4", "Unc79", "Casp6", "Bcl2l11", "Pcdh10", "Abtb1", "Mcf2l", "Dock4", "Lmo3", "Socs3", "D930015E06Rik", "Pkia", "Ccpg1", "Rhbdl3", "Slc12a6", "Gprin1", "Rnf114", "Art3", "Zfhx2", "Dlgap4", "Peli2", "Palm", "Myl12b", "Enox1", "Agpat4", "Cnot6l", "Grid2", "BC031353", "Megf11", "Tbc1d9", "Sbk1", "Mapt", "Jund", "Nub1", "Runx1t1", "Hes5", "Eepd1", "Iqgap2", "Rab2a", "Myh10", "Atp6v0d1", "Cbfa2t2", "Syt9"))
+###no Zfp238, 8430427H17Rik, Tmem2, Accn2, D930015E06Rik, BC031353
+
+cluster4_features <- list(c("Bahcc1", "Slc39a11", "Kalrn", "Slc35f1", "Akt3", "E2f1", "Bcl2l1", "Bcar1", "Tmod1", "Mtap1b", "Tecta", "Zfp532", "Chgb", "Gamt", "Nin", "Ralgps2", "Nfix", "Nrxn3", "Gdpd5", "Apba2", "Syt11", "Fam78b", "Dclk2", "Epha3", "D0H4S114", "Lhfpl2", "Robo1", "Rab6b", "Igsf3", "Myo6", "D11Bwg0517e", "Zfp423", "Ubl7", "Dcx", "Atp2b2", "Lmo2", "Ppp2r2b", "Sema7a", "Nol4", "Septin-5", "Mdga1", "Mbd5", "Elavl4", "Pou4f1", "Rasl11b", "Ntm", "Dyrk1b", "Kdm6b", "Limk1", "Rbm9", "Pkdcc", "Nfkbia", "Ef05", "Tubb2a", "Rhebl1", "Ecel1", "Igfbpl1", "Phc2", "Nln", "Spire2", "Hey1", "Apcdd1", "Tubb2b", "Trim46", "Gri0", "Myl1", "A2bp1", "Cxcr4", "Slc29a4", "Pfkfb4", "BC018242", "Mllt3", "Rab11fip5", "Tnnt1", "Klc1", "Bcl11b", "Lrrn3", "Nicn1", "Acvr2b", "Sema3f", "1110003E01Rik", "Elavl3"))
+###Mtap1b, D0H4S114, D11Bwg0517e, Septin-5, Rbm9, Ef05, Gri0, A2bp1, BC018242, 1110003E01Rik
+
+###down regulated 
+cluster5_features <- list(c("Prr18", "Ank2", "Ascl1", "Pipox", "Fcho1", "Lifr", "Abcb9", "Plcd4", "Pros1", "Ppp2r5a", "Nr2f6", "Nwd1", "Sall3", "Jam2", "Rab17", "Rapgef3", "Xkr9", "4933428G20Rik", "Hectd2", "Plk2", "Adora2b", "Oxr1", "Diras2", "Map4k4", "Usp2", "Thrsp", "Tsc22d3", "Il17d", "Rprml", "Lhfp", "Cx3cl1", "Acsl3", "Zdhhc9", "Fam13c", "Prickle1", "Fkbp2", "Vav3", "Mpdz", "Kcnk5", "Car3", "Nprl3", "Plekhb1", "Zfp710", "Triobp", "Cdc42ep2", "Esrrb", "Camk1g", "Tle4", "Odz4", "Megf10", "Pitpnc1", "Stk24", "Tcf7l2", "Apoc1", "Aspdh", "Spata6", "Nes", "Igfbp3", "Ets1", "Zfp704", "Slc35b4", "Vash1"))
+###no Odz4
+cluster6_features <- list(c("Skil", "Wnt7b", "Hdac7", "Vldlr", "Tgfbr2", "Tsc22d2", "Vps37b", "Sema6d", "Trib2", "Inhbb", "Sema4b", "Slc1a3", "Wwc1", "Ctnnd2", "Fgf1", "Tmc7", "Tsc22d4", "Ppapdc1a", "Pld1", "Dusp1", "Aacs", "AI646023", "Nfat5", "Pou3f1", "Rnf182", "Fgf12", "Rfx2", "Stard4", "Traf3", "Slc25a18", "Mapre2", "Lasp1", "Aatk", "Dtx4"))
+## No Ppapdc1a, AI646023
+
+cluster7_features <- list(c("Traf3ip2", "Ascc2", "G0s2", "Tmem20", "Ccdc136", "Gas7", "Olig2", "Slc29a1", "Cspg5", "1500015O10Rik", "Alg8", "Sipa1l1", "Mtss1", "Ubxn8", "Fbln2", "Lrrn2", "Ptgds", "Capzb", "Nup210", "Vstm2b", "Cd276", "Tbc1d1", "Igfbp2", "ENSMUSG00000054863", "Aif1l", "Josd2", "Rsad2", "Arhgap8", "Srl", "Sdpr", "Kcnk1", "Camk2b", "Rrbp1", "Tle6", "Ak1", "Rab27b", "Slc12a2", "Plxnb3", "Alg10b", "4930572J05Rik", "Bag3", "Cdc25b", "Galk1", "Ssbp4", "Lrp4", "Lrrfip1", "Pmf1", "Lgals1"))
+###Tmem20, 1500015O10Rik, ENSMUSG00000054863, Sdpr, 4930572J05Rik
+
+
+
+cluster_lists <- list(
+  cluster1_features, cluster2_features, cluster3_features,
+  cluster4_features, cluster5_features, cluster6_features, cluster7_features
+)
+
+heatmap_list <- list()
+
+for (i in 1:7) {
+  genes_of_interest <- cluster_lists[[i]][[1]]
+  genes_of_interest <- genes_of_interest[genes_of_interest %in% rownames(G2N)]
+  
+  expr_matrices <- lapply(unique(G2N$Glia), function(glia_level) {
+    subset_G2N <- subset(G2N, subset = Glia == glia_level)
+    if (ncol(subset_G2N) == 0) return(NULL)
+    avg_expr <- AverageExpression(subset_G2N, features = genes_of_interest, slot = "scale.data")$RNA
+    colnames(avg_expr) <- paste(glia_level, colnames(avg_expr), sep = "_")
+    avg_expr
+  })
+  
+  combined_matrix <- do.call(cbind, expr_matrices)
+  
+  # Save pheatmap as a grob
+  hm <- pheatmap(as.matrix(combined_matrix),
+                 color = viridis(100),
+                 cluster_rows = TRUE,
+                 cluster_cols = FALSE,
+                 fontsize_row = 8,
+                 fontsize_col = 8,
+                 angle_col = 45,
+                 main = paste("Cluster", i),
+                 silent = TRUE)  # silent returns a grob
+  
+  heatmap_list[[i]] <- hm[[4]]  # the gtable object
+}
+
+# Arrange all heatmaps together
+do.call(grid.arrange, c(heatmap_list, ncol = 7))
+
+```
+
+
+
+
+#### new stuff
+
+```{r}
+# Load libraries
+library(dplyr)
+library(ggplot2)
+library(Seurat)
+
+# Ensure RNA assay is active
+DefaultAssay(G2N) <- "RNA"
+
+# Factor levels for proper layout
+G2N$Glia <- factor(G2N$Glia, levels = c( "O2N","A2N"))  # A2N left, O2N right
+G2N$RV <- factor(G2N$RV, levels = c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2"))
+
+# Binary expression: counts > 1
+G2N$Rbfox3_expr <- ifelse(
+  GetAssayData(G2N, assay = "RNA", layer = "counts")["Rbfox3", ] > 1,
+  "Yes", "No"
+)
+
+# Summarize for pie charts
+pie_df <- G2N@meta.data %>%
+  count(RV, Glia, Rbfox3_expr) %>%
+  group_by(RV, Glia) %>%
+  mutate(freq = n / sum(n))
+
+# Plot maximally compact pies
+ggplot(pie_df, aes(x = "", y = freq, fill = Rbfox3_expr)) +
+  geom_bar(stat = "identity", width = 0.9, color = NA) +   # remove bar lines
+  coord_polar("y") +
+  facet_grid(RV ~ Glia) +
+  scale_fill_manual(values = c("No" = "lightgrey", "Yes" = "#2F3826")) +
+  theme_void() +
+  theme(
+    panel.spacing.x = unit(0, "pt"),
+    panel.spacing.y = unit(0, "pt"),
+    plot.margin     = margin(0, 0, 0, 0),
+    strip.text      = element_text(margin = margin(0, 0, 0, 0)),
+    strip.background = element_blank(),
+    panel.background = element_blank()
+  ) +
+  labs(fill = "Rbfox3 >1 transcript")
+
+### numbers 
+pie_df %>% 
+  dplyr::filter(Rbfox3_expr == "Yes") %>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate(percent = freq*100) %>% 
+  dplyr::select(RV, Glia, percent) %>% 
+  print()
+
+## stats 
+library(dplyr)
+
+# Loop over RV conditions and run Fisher test O2N vs A2N
+results <- pie_df %>%
+  ungroup() %>%
+  group_by(RV) %>%
+  summarise(
+    p.value = {
+      # Create 2x2 table: rows=Glia, columns=Rbfox3_expr
+      tbl <- xtabs(n ~ Glia + Rbfox3_expr, data = cur_data())
+      fisher.test(tbl)$p.value
+    }
+  )
+
+results
+
+results <- results %>%
+  mutate(signif = case_when(
+    p.value < 0.001 ~ "***",
+    p.value < 0.01  ~ "**",
+    p.value < 0.05  ~ "*",
+    TRUE            ~ "ns"
+  ))
+
+results
+
+
+```
+
+
+
+

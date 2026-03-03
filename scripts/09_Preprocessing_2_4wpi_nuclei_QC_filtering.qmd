@@ -1,0 +1,505 @@
+---
+title: 'Dlx2 reprograms the transcriptome of astrocyte-derived interneurons and enforces canonical laminar positioning.'
+subtitle: '1: Preprocessing 2 and 4wPI Cells'
+
+---
+
+```{r}
+#| label: reportsetup
+#| include: false
+knitr::opts_chunk$set(echo = T, include = T,
+                      fig.width = 20, fig.height = 10,
+                      fig.align = 'center',
+                      warning = F, message = F,
+                      eval=T) 
+```
+
+The space below contain the codes used in this analysis for the purposes of
+transparency and reproducibility:
+
+<!-- Describe methodology -->
+
+## Load dependencies
+The code below loads all dependencies to run the script.
+```{r}
+#| label: load_dependencies
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+suppressPackageStartupMessages({
+    library(tidyverse)
+    library(Seurat)
+    library(SeuratWrappers)
+    library(flexmix)
+    library(ggplot2)
+    library(patchwork)
+    library(DoubletFinder)
+    library(scDblFinder)
+  library(tidyverse)
+    library(Seurat)
+    library(SeuratWrappers)
+    library(flexmix)
+    library(ggplot2)
+    library(patchwork)
+    library(DoubletFinder)
+    library(scDblFinder)
+    library(UpSetR)
+    library(clustree)
+    library(MatrixGenerics)
+    library(RColorBrewer)
+    library(scCustomize)
+})
+```
+
+## Import count matrices
+
+For every experiment, we will prepare a samples metadata file (CSV) that should 
+contain at least the following columns:
+
+PATH : Path to gene expression matrix of each experiment
+
+ID : Experiment name or ID that will be passed to orig.ident
+
+The metadata file can contain any other information pertaining to the experiment 
+which will be passed into the metadata dataframe of the Seurat object.
+
+```{r}
+#| label: load_metadata
+#| eval: true
+#| include: true
+#| classes: styled-output
+## Import samples meta file.
+samples.meta <- read_csv("/samples.csv")
+
+samples.meta
+```
+
+We start by importing the metadata file and create a list of Seurat objects for 
+each experiment:
+
+```{r}
+#| label: load_count_matrices
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+#all(dir.exists(samples.meta$Path))
+
+## In this case I will filter for all 2wpi samples only.
+samples.meta.2wpi <- samples.meta %>% 
+  filter(timepoint == "2wpi")
+
+## Creating seurat list with all samples.
+seuratlist.2wpi <- apply(samples.meta.2wpi, 1, function(line){
+
+    # Load directory containing the matrix.mtx, features.tsv, and barcodes.tsv files provided by 10X.
+    sample <- Read10X(data.dir = line[["Path"]])
+  
+      # Create seurat objects
+      sample.seurat <- CreateSeuratObject(counts = sample,
+                                          project = line[["RV"]],
+                                          min.cells = 4, min.features = 200)
+      sample.seurat$experiment <- "RNA"
+      # Adding additional metadata 
+      sample.seurat@meta.data <- mutate(sample.seurat@meta.data, !!!line)
+  
+      sample.seurat
+})
+
+names(seuratlist.2wpi) <- samples.meta.2wpi$RV
+```
+
+## Quantify QC metrics
+
+Next, add more information on the quality of each cell by quantifying the 
+following metrics:
+
+- Percent mitochondria
+- Label low quality cells (MiQC)
+- Percent ribosomal
+- Doublet annotation
+- Cell cycle phase
+
+These values will be stored in the meta.data slot of each Seurat object.
+
+### Percent mitochondria
+```{r}
+#| label: percent_mito
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+### Identify percentage of mitochondrial genes
+seuratlist.2wpi <- lapply(seuratlist.2wpi, function(sample){
+    sample$percent.mt <- PercentageFeatureSet(sample, pattern = "^mt-") 
+    Idents(sample) <- "experiment"
+    sample
+})
+
+# Run miQC-wrapper to model both the proportion of reads mapping to mtDNA genes 
+# and the number of detected genes with mixture models in a probabilistic 
+# framework to identify the low-quality cells
+
+seuratlist.2wpi <- lapply(seuratlist.2wpi, function(sample){
+    sample <- RunMiQC(sample, percent.mt = "percent.mt", 
+                      nFeature_RNA = "nFeature_RNA", posterior.cutoff = 0.75,
+                      model.slot = "flexmix_model")
+    sample
+})
+```
+
+### Orig Label low quality cells (MiQC)
+```{r, fig.width=16, fig.height=8}
+#| label: MiQC_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Plots for MiQC
+do.call(wrap_plots,lapply(seuratlist.2wpi, function(sample){
+    PlotMiQC(sample, color.by = "miQC.probability") + 
+      scale_color_gradient(low = "grey", high = "purple") + 
+      labs(title= sample$orig.ident[1],
+           subtitle=paste("Max:", round(max(sample$percent.mt[sample$miQC.probability < 0.75]), digits = 3))) +
+        theme(plot.title = element_text(size = 20),
+              plot.subtitle = element_text(size = 15),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size=15),
+              legend.text = element_text(size=15))
+}))
+```
+
+### Modified Label low quality cells (MiQC)
+```{r, fig.width=16, fig.height=8}
+#| label: MiQC_plot_2
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+plots <- lapply(seuratlist.2wpi, function(sample) {
+  # Debugging: Check sample structure
+  tryCatch({
+    if (length(sample$percent.mt) > 0 && length(sample$miQC.probability) > 0) {
+      # Check if filtering leads to empty data
+      valid_indices <- which(sample$miQC.probability < 0.75)
+      
+      if (length(valid_indices) > 0) {
+        max_mt <- round(max(sample$percent.mt[valid_indices]), digits = 3)
+      } else {
+        max_mt <- NA
+      }
+      
+      # Convert orig.ident to character
+      title <- as.character(sample$orig.ident[1])
+      
+      # Generate plot
+      PlotMiQC(sample, color.by = "miQC.probability") + 
+        scale_color_gradient(low = "grey", high = "purple") + 
+        labs(title = title,
+             subtitle = paste("Max:", max_mt)) +
+        theme(plot.title = element_text(size = 20),
+              plot.subtitle = element_text(size = 15),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size = 15),
+              legend.text = element_text(size = 15))
+    } else {
+      NULL
+    }
+  }, error = function(e) {
+    message("Error in sample: ", as.character(sample$orig.ident[1]), " - ", e$message)
+    NULL
+  })
+})
+
+# Remove NULL results
+plots <- Filter(Negate(is.null), plots)
+
+# Combine plots
+if (length(plots) > 0) {
+  do.call(wrap_plots, plots)
+} else {
+  message("No valid plots to display.")
+}
+```
+
+
+
+### Percent ribosomal
+```{r}
+#| label: percent_ribo
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+## calculate percent ribosomal
+seuratlist.2wpi <- lapply(seuratlist.2wpi, function(sample){
+    sample$percent.rb <- PercentageFeatureSet(sample, pattern = "^Rp[sl]") 
+    Idents(sample) <- "experiment"
+    sample
+})
+```
+
+#### Plot correlation between mitochondrial and ribosomal genes
+```{r, fig.width=16, fig.height=8}
+#| label: scatter_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+### Plot mitochondrial genes VS ribosomal genes to see correlation
+do.call(wrap_plots,lapply(seuratlist.2wpi, function(sample){
+    FeatureScatter(sample, feature1 = "percent.rb", feature2 = "percent.mt") +
+        labs(title = sample$orig.ident[1]) +
+        theme(plot.title = element_text(size = 20),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.height = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size = 15),
+              legend.text = element_text(size = 15))
+}))
+```
+
+```{r}
+#| label: vln_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+#| height: 8
+
+### Plot mitochondrial genes, ribosomal genes, and number of RNA counts per dataset 
+lapply(seuratlist.2wpi, function(sample){
+  plots <- lapply(c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"), function(feature){
+    VlnPlot(sample, features = feature, pt.size = 0.01) +
+        theme(plot.title = element_text(size = 15,face = "plain"),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.height = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size = 15),
+              legend.text = element_text(size = 15),
+              legend.position="none") 
+  })
+  wrap_plots(plots, ncol = 4)  + 
+  plot_annotation(title=sample$orig.ident[1], 
+                  theme=theme(plot.title=element_text(hjust=0.5,face = "bold", size = 25)))
+}) 
+
+```
+
+```{r}
+#| label: scDblfinder
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+## annotate doublets using scDblFinder
+set.seed(123)
+
+seuratlist.2wpi <- lapply(seuratlist.2wpi, function(sample){
+    sce <- scDblFinder(GetAssayData(sample, assay = "RNA", layer = "counts"))
+    sample$scDblFinder.class <- sce$scDblFinder.class
+    sample@meta.data <- sample@meta.data %>% 
+      mutate(scDblFinder.class = ifelse(sample@meta.data$scDblFinder.class == "doublet", "Doublet", "Singlet"))
+    sample
+})
+```
+
+####original 
+```{r}
+#| label: scDblfinder_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+scdbl.plot <- lapply(seuratlist.2wpi, function(sample){
+    VlnPlot(sample, features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"), group.by = "scDblFinder.class", ncol = 4) + 
+    theme(legend.position = 'right') +
+    labs(fill = "scDblFinder")
+})
+
+lapply(names(seuratlist.2wpi), function(sample){
+  scdbl.plot[[sample]]  + 
+  plot_annotation(title=sample, 
+                  theme=theme(plot.title=element_text(hjust=0.5,face = "bold",size = 20)))
+})
+```
+
+
+```{r}
+#| label: cycle_genes
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+## quantify cell cycle phase
+### run cell cycle scoring
+cc.genes <- cc.genes.updated.2019
+
+##################
+# To convert cc.genes to other organism of choice, run the following:
+cc.genes <- lapply(cc.genes, function(genes) {
+   gprofiler2::gorth(genes, 
+        target_organism = "mmusculus"  
+   )$ortholog_name
+})
+##################
+
+seuratlist.2wpi <- lapply(seuratlist.2wpi, function(sample){
+	sample <- NormalizeData(sample)
+    CellCycleScoring(sample, 
+                     s.features = cc.genes$s.genes, 
+                     g2m.features = cc.genes$g2m.genes, 
+                     set.ident = FALSE)
+})
+```
+
+## Cell cycle scoring
+```{r, fig.width=16, fig.height=8}
+#| label: cycle_genes_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+do.call(wrap_plots,lapply(seuratlist.2wpi, function(sample){
+    sample@meta.data %>% 
+        ggplot(aes(x=Phase, fill = Phase)) + 
+        geom_bar() +
+        theme_minimal() +
+        scale_fill_brewer(palette = "Set2") +
+        labs(title = sample$orig.ident[1]) +
+        theme(plot.title = element_text(size = 20),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.height = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size=15),
+              legend.text = element_text(size=15)) 
+}))
+```
+
+
+```{r}
+#| label: save_obj
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Save raw data, before filtering
+saveRDS(seuratlist.2wpi, "/seuratlist_2and4wpi_raw.rds")
+
+seuratlist.2wpi <- readRDS("/seuratlist_2and4wpi_raw.rds")
+```
+
+## Filtering data
+
+We filter our data usingthresholding via 5 MAD (median absolute deviations). Mito cutoff at 1%, why miQC.keep??
+```{r}
+#| label: filt_obj_MAD
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+## Thresholding using median absolute deviation from the median
+qc.df <- do.call(rbind,lapply(seuratlist.2wpi, function(sample){
+    feature.cutoff.min <- median(sample@meta.data$nFeature_RNA) - 5*mad(sample@meta.data$nFeature_RNA)
+    feature.cutoff.min <- ifelse(feature.cutoff.min < 100, 100, feature.cutoff.min)
+    feature.cutoff.max <- median(sample@meta.data$nFeature_RNA) + 5*mad(sample@meta.data$nFeature_RNA)
+    return(data.frame(feature.cutoff.min = feature.cutoff.min,
+                      feature.cutoff.max = feature.cutoff.max))
+}))
+
+seuratlist.2wpi.filt <- lapply(seuratlist.2wpi, function(sample) {
+    sample.id <- sample$orig.ident[1]
+    subset(sample, 
+           subset = nFeature_RNA > qc.df[sample.id,]$feature.cutoff.min & 
+                    nFeature_RNA < qc.df[sample.id,]$feature.cutoff.max & 
+                    miQC.keep == "keep" & 
+                    scDblFinder.class == "Singlet")
+})
+
+```
+
+## Dimensional reduction of filtered data
+
+Performing Normalization and dimensional reduction via pca for each sample
+```{r}
+#| label: dim_red
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Increasing maximum size allowed for Global size  
+options(future.globals.maxSize = 8000 * 1024^2)
+
+## Run LogNorm, FindVariableFeatures and Scale on filtered samples
+seuratlist.2wpi.filt <- lapply(seuratlist.2wpi.filt, function(sample){
+  sample <- FindVariableFeatures(sample, selection.method = "vst", nfeatures = 2000)
+  sample <- ScaleData(sample, features = rownames(sample))
+})
+
+## Perform dimensional reduction
+seuratlist.2wpi.filt <- lapply(seuratlist.2wpi.filt, function(sample){
+	sample <- RunPCA(sample)
+  sample 
+})
+
+saveRDS(seuratlist.2wpi.filt, "/seuratlist_2and4wpi_LogNorm_filtered.rds")
+```
+
+
+```{r}
+#| label: vln_plot_postfilt
+#| eval: true
+#| include: true
+#| classes: styled-output
+#| height: 8
+
+### Plot mitochondrial genes, ribosomal genes, and number of RNA counts per dataset 
+lapply(seuratlist.2wpi.filt, function(sample){
+  plots <- lapply(c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"), function(feature){
+    VlnPlot(sample, features = feature, pt.size = 0.01) +
+        theme(plot.title = element_text(size = 15,face = "plain"),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.height = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size = 15),
+              legend.text = element_text(size = 15),
+              legend.position="none") 
+  })
+  wrap_plots(plots, ncol = 4)  + 
+  plot_annotation(title=sample$orig.ident[1], 
+                  theme=theme(plot.title=element_text(hjust=0.5,face = "bold", size = 25)))
+}) 
+
+```
+
+
+```{r}
+# Tools' versions used during this analysis
+sessionInfo()
+```
+
+
+
+
+
+

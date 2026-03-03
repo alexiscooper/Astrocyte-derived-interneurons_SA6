@@ -1,0 +1,313 @@
+---
+title: "Seurat to h5ad LogNorm RNA 4dpi"
+format: html
+editor: visual
+---
+
+```{r}
+A2N_5 <- readRDS('/merged_5_A2N2.rds')
+```
+
+```{r}
+# Check number of scaled genes
+nrow(A2N_5@assays$RNA@layers$scale.data)
+Layers(A2N_5[["RNA"]])
+```
+
+```{r}
+A2N_5$RV <- factor(A2N_5$RV,levels=c("Control", "Ascl1WT", "Ascl1WTBcl2","Ascl1SA6","Ascl1SA6Bcl2"))
+print(table(A2N_5$RV))
+Idents(A2N_5) <- "RV"
+A2N_5 <- subset(A2N_5, downsample=1500)
+print(table(A2N_5$RV))
+DimPlot(A2N_5, group.by = 'RV', pt.size = 0.5) + Blank_Theme() 
+```
+
+```{r}
+# Convert to V3/4/Assay structure)
+A2N_5.v3 <- Convert_Assay(seurat_object = A2N_5, convert_to = "V3")
+
+write.csv(GetAssayData(A2N_5.v3, layer = "scale.data"),
+          "/Users/alexiscooper/The Francis Crick Dropbox/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/4dpi/Preperation for R_to_python/gene_counts_matrix/A2N2_5_scaled_matrix_210525.csv")
+write.csv(GetAssayData(A2N_5.v3, layer = "data"),
+          "/Users/alexiscooper/The Francis Crick Dropbox/GuillemotF/Dropbox Alexis Cooper/Cooper_et_al_2025/4dpi/Preperation for R_to_python/gene_counts_matrix/A2N2_5_data_210525.csv")
+
+# Check number of scaled genes
+nrow(A2N_5.v3@assays$RNA$scale.data)
+nrow(A2N_5.v3@assays$RNA$data)
+nrow(A2N_5.v3@assays$RNA$counts)
+
+A2N_5.v3 <- A2N_5.v3 %>%
+  DietSeurat(., assays = "RNA", layers = c("counts"), dimreducs = c("pca", "umap")) 
+# Convert to V3/4/Assay structure)
+A2N_5.v3 <- Convert_Assay(seurat_object = A2N_5, convert_to = "V3")
+```
+
+```{r}
+# Convert categorical metadata columns to characters for compatibility
+metadata_cols <- c("orig.ident", "RV", "sample_type", "timepoint", "Phase", 
+                   "miQC.keep","seurat_clusters","cell.type")
+A2N_5.v3@meta.data[metadata_cols] <- lapply(A2N_5.v3@meta.data[metadata_cols], as.character)
+# Remove dots from column names to avoid Python issues
+colnames(A2N_5.v3@meta.data) <- str_replace_all(colnames(A2N_5.v3@meta.data), "\\.", "_")
+```
+
+```{r}
+DefaultAssay(A2N_5.v3) <- "RNA"
+fileout <- "/4dpi_A2N2_5.h5Seurat"
+SaveH5Seurat(A2N_5.v3, filename = fileout, overwrite = TRUE)
+Convert(fileout, dest = "h5ad", overwrite = TRUE)
+```
+
+#### "Control","Ascl1WTBcl2","Ascl1SA6Bcl2","SA6Dlx2"
+
+```{r}
+mergeAll_filtered <- readRDS("/seurat_4dpi_merged_LogNorm.rds")      
+```
+
+mergeAll_4 \<- subset(mergeAll_filtered, subset = RV %in% c("Control","Ascl1WTBcl2","Ascl1SA6Bcl2","SA6Dlx2"))
+
+```{r}
+mergeAll_4 <- subset(mergeAll_filtered, subset = RV %in% c("Control","Ascl1WTBcl2","Ascl1SA6Bcl2","Ascl1SA6Dlx2_2"))
+```
+
+```{r}
+print(table(mergeAll_4$RV))
+Idents(mergeAll_4) <- "RV"
+mergeAll_4 <- subset(mergeAll_4, downsample=1882)
+print(table(mergeAll_4$RV))
+```
+
+```{r}
+mergeAll_4 <- RunPCA(mergeAll_4, assay = "RNA")
+
+
+# Step 2: Integrate the layers using the RPCA method
+integrated.mergeAll_filtered <- IntegrateLayers(
+  object = mergeAll_filtered,  # Your Seurat object
+  method = RPCAIntegration,  # Integration method (RPCA)
+  orig.reduction = "pca",  # Original PCA reduction
+  new.reduction = "integrated.rpca",  # New integrated reduction name
+  normalization.method = "LogNorm",  # Log-normalization before integration
+  verbose = TRUE  # Display progress
+)
+```
+
+```{r}
+# Step 1: Access the RNA assay of the Seurat object
+rna_assay <- mergeAll_4[["RNA"]]
+
+# Step 2: List the layers in the RNA assay
+layers_to_rename <- names(rna_assay@layers)
+
+# Step 3: Define the old and new names for the layers
+old_name <- "Ascl1SA6Dlx2_2"  # Old name to be replaced
+new_name <- "SA6Dlx2"         # New name for the layer
+
+# Step 4: Rename layers and update column/row names explicitly for the "Ascl1SA6Dlx2_2" layer
+if ("counts.Ascl1SA6Dlx2_2" %in% layers_to_rename) {
+  colnames(rna_assay@layers[["counts.Ascl1SA6Dlx2_2"]]) <- gsub(old_name, new_name, colnames(rna_assay@layers[["counts.Ascl1SA6Dlx2_2"]]))
+  rownames(rna_assay@layers[["counts.Ascl1SA6Dlx2_2"]]) <- gsub(old_name, new_name, rownames(rna_assay@layers[["counts.Ascl1SA6Dlx2_2"]]))
+  rna_assay@layers[["counts.SA6Dlx2"]] <- rna_assay@layers[["counts.Ascl1SA6Dlx2_2"]]
+  rna_assay@layers[["counts.Ascl1SA6Dlx2_2"]] <- NULL
+}
+
+if ("data.Ascl1SA6Dlx2_2" %in% layers_to_rename) {
+  colnames(rna_assay@layers[["data.Ascl1SA6Dlx2_2"]]) <- gsub(old_name, new_name, colnames(rna_assay@layers[["data.Ascl1SA6Dlx2_2"]]))
+  rownames(rna_assay@layers[["data.Ascl1SA6Dlx2_2"]]) <- gsub(old_name, new_name, rownames(rna_assay@layers[["data.Ascl1SA6Dlx2_2"]]))
+  rna_assay@layers[["data.SA6Dlx2"]] <- rna_assay@layers[["data.Ascl1SA6Dlx2_2"]]
+  rna_assay@layers[["data.Ascl1SA6Dlx2_2"]] <- NULL
+}
+
+if ("scale.data.Ascl1SA6Dlx2_2" %in% layers_to_rename) {
+  colnames(rna_assay@layers[["scale.data.Ascl1SA6Dlx2_2"]]) <- gsub(old_name, new_name, colnames(rna_assay@layers[["scale.data.Ascl1SA6Dlx2_2"]]))
+  rownames(rna_assay@layers[["scale.data.Ascl1SA6Dlx2_2"]]) <- gsub(old_name, new_name, rownames(rna_assay@layers[["scale.data.Ascl1SA6Dlx2_2"]]))
+  rna_assay@layers[["scale.data.SA6Dlx2"]] <- rna_assay@layers[["scale.data.Ascl1SA6Dlx2_2"]]
+  rna_assay@layers[["scale.data.Ascl1SA6Dlx2_2"]] <- NULL
+}
+
+# Step 5: Verify the renaming
+print(names(rna_assay@layers))  # Should now show the updated layer names
+
+```
+
+```{r}
+rna_assay <- mergeAll_4[["RNA"]]
+mergeAll_4 <- RunPCA(mergeAll_4, assay = "RNA")
+
+# Step 2: Integrate the layers using the RPCA method
+integrated.mergeAll_4 <- IntegrateLayers(
+  object = mergeAll_4,  # Your Seurat object
+  method = "RPCAIntegration",  # Integration method (RPCA)
+  orig.reduction = "pca",  # Original PCA reduction
+  new.reduction = "integrated.rpca",  # New integrated reduction name
+  normalization.method = "LogNorm",  # Log-normalization before integration
+  verbose = TRUE  # Display progress
+)
+
+# Step 3: Verify the integrated object
+
+
+(integrated.mergeAll_4)
+```
+
+```{r Visualisation, warning = FALSE, message = FALSE, , fig.width=6, fig.height=4 }
+print(table(mergeAll_4$RV))
+Idents(mergeAll_4) <- "RV"
+mergeAll_4 <- subset(mergeAll_4, downsample=1882)
+print(table(mergeAll_4$RV))
+```
+
+```{r}
+mergeAll_4 <- mergeAll_4 %>%
+  DietSeurat(., assays = "RNA", layers = c("counts"))
+mergeAll_4 <- NormalizeData(mergeAll_4, assay = "RNA")
+mergeAll_4 <- FindVariableFeatures(mergeAll_4)
+mergeAll_4 <- ScaleData(mergeAll_4, features = rownames(mergeAll_4))
+mergeAll_4 <- RunPCA(mergeAll_4, features = VariableFeatures(mergeAll_4), verbose = TRUE)
+mergeAll_4 <- FindNeighbors(object = mergeAll_4, dims = 1:40) 
+mergeAll_4 <- FindClusters(object = mergeAll_4, resolution = 1.2)
+mergeAll_4 <- RunUMAP(object = mergeAll_4, dims = 1:16)
+DimPlot(mergeAll_4, group.by = 'seurat_clusters', pt.size = 0.5, label = TRUE) + Blank_Theme()
+DimPlot(mergeAll_4, group.by = 'RV', pt.size = 0.5) + Blank_Theme()
+```
+
+FeaturePlot(mergeAll_4, features = c("Top2a"), cols = c("lightgrey", "blue")) & Blank_Theme() & theme(plot.title = element_blank())
+
+```{r}
+mergeAll_4_new<- RenameIdents(mergeAll_4,
+                         `0` = "Neuron_like3", 
+                         `1` = "Microglia",
+                         `2` = "Astrocyte_like",
+                         `3` = "Neuron_like2",
+                         `4` = "Astrocyte_like", 
+                         `5` = "Intermediate", 
+                         `6` = "Intermediate",
+                         `7` = "OPCs", 
+                         `8` = "Astrocytes",
+                         `9` = "Intermediate",
+                         `10` = "cycling",
+                         `11` = "Neuron_like1", 
+                         `12` = "Neuron_like",
+                         `13` = "remove",
+                         `14` = "Intermediate_OPC",
+                         `15` = "Astrocytes", 
+                         `16` = "Neuron_like", 
+                         `17` = "cycling",
+                         `18` = "Neuron_like4", 
+                         `19` = "Microglia",
+                         `20` = "Oligodendrocytes",
+                         `21` = "cycling_OPCs",
+                         `22` = "Microglia", 
+                         `23` = "remove", 
+                         `24` = "Microglia",
+                         `25` = "remove", 
+                         `26` = "remove",
+                         `27` = "Microglia",
+                         `28` = "cycling",
+                         `29` = "Pericytes", 
+                         `30` = "Microglia", 
+                         `31` = "cycling_OPCs", 
+                         `32` = "remove", 
+                         `33` = "remove")
+
+
+mergeAll_4_new[["cell.type"]] <- Idents(object = mergeAll_4_new)
+#mergeAll_4_new$cell.type <- factor(mergeAll_4_new$cell.type, levels = c("Astrocytes","cycling", "Astrocyte_like", "Intermediate", "Neuron_like1", "Neuron_like2" ))
+DimPlot(mergeAll_4_new, group.by = 'cell.type', pt.size = 0.5) + Blank_Theme() 
+DimPlot(mergeAll_4_new, split.by = 'RV', pt.size = 0.5) + Blank_Theme() 
+DimPlot(mergeAll_4_new, group.by = 'seurat_clusters', pt.size = 0.5) + Blank_Theme() 
+
+```
+
+```{r}
+mergeAll_4_new <- subset(mergeAll_4_new, subset = cell.type %in% c("remove"), invert = TRUE)
+DimPlot(mergeAll_4_new, group.by = 'cell.type', pt.size = 0.5) + Blank_Theme() 
+```
+
+```{r}
+selected_cell_types <- c("Neuron_like3", "Astrocyte_like", "Intermediate", "Neuron_like1", "cycling",  "Astrocytes", "Neuron_like2", "Neuron_like3", "Neuron_like4")
+A2N <- subset(mergeAll_4_new, subset = cell.type %in% selected_cell_types)
+DimPlot(A2N, group.by = "cell.type", shuffle = TRUE)
+```
+
+```{r}
+A2N_5 <- NormalizeData(A2N, assay = "RNA")
+A2N_5 <- FindVariableFeatures(A2N_5)
+A2N_5 <- ScaleData(A2N_5, features = rownames(A2N_5))
+A2N_5 <- RunPCA(A2N_5, features = VariableFeatures(A2N_5), verbose = TRUE)
+A2N_5 <- FindNeighbors(object = A2N_5, dims = 1:40) 
+A2N_5 <- FindClusters(object = A2N_5, resolution = 0.8)
+A2N_5 <- RunUMAP(object = A2N_5, dims = 1:27)
+DimPlot(A2N_5, group.by = 'cell.type', pt.size = 0.5) + Blank_Theme() 
+DimPlot(A2N_5, group.by = 'seurat_clusters', pt.size = 0.5) + Blank_Theme() 
+
+```
+
+```{r}
+saveRDS(A2N_5, '/seurat_4dpi_LogNorm_newID_merged_5_A2N2.rds')
+A2N_5 <- readRDS('/seurat_4dpi_LogNorm_newID_merged_5_A2N2.rds')
+```
+
+```{r}
+A2N_5 <- A2N %>%
+  DietSeurat(., assays = "RNA", layers = c("counts"))
+A2N_5 <- NormalizeData(A2N_5, assay = "RNA")
+A2N_5 <- FindVariableFeatures(A2N_5)
+A2N_5 <- ScaleData(A2N_5, features = rownames(A2N_5))
+A2N_5 <- RunPCA(A2N_5, features = VariableFeatures(A2N_5), verbose = TRUE)
+A2N_5 <- FindNeighbors(object = A2N_5, dims = 1:40) 
+A2N_5 <- FindClusters(object = A2N_5, resolution = 0.8)
+A2N_5 <- RunUMAP(object = A2N_5, dims = 1:27)
+DimPlot(A2N_5, group.by = 'cell.type', pt.size = 0.5) + Blank_Theme() 
+DimPlot(A2N_5, group.by = 'seurat_clusters', pt.size = 0.5) + Blank_Theme() 
+
+# Check number of scaled genes
+nrow(A2N_5@assays$RNA@layers$scale.data)
+Layers(A2N_5[["RNA"]])
+```
+
+```{r}
+A2N_5$RV <- factor(A2N_5$RV,levels=c("Control", "Ascl1WT", "Ascl1WTBcl2","Ascl1SA6","Ascl1SA6Bcl2"))
+print(table(A2N_5$RV))
+Idents(A2N_5) <- "RV"
+A2N_5 <- subset(A2N_5, downsample=1500)
+print(table(A2N_5$RV))
+DimPlot(A2N_5, group.by = 'RV', pt.size = 0.5) + Blank_Theme() 
+```
+
+```{r}
+# Convert to V3/4/Assay structure)
+A2N_5.v3 <- Convert_Assay(seurat_object = A2N_5, convert_to = "V3")
+
+write.csv(GetAssayData(A2N_5.v3, layer = "scale.data"),
+          "/A2N2_5_scaled_matrix.csv")
+write.csv(GetAssayData(A2N_5.v3, layer = "data"),
+          "/A2N2_5_data.csv")
+
+# Check number of scaled genes
+nrow(A2N_5.v3@assays$RNA$scale.data)
+nrow(A2N_5.v3@assays$RNA$data)
+nrow(A2N_5.v3@assays$RNA$counts)
+
+A2N_5.v3 <- A2N_5.v3 %>%
+  DietSeurat(., assays = "RNA", layers = c("counts"), dimreducs = c("pca", "umap")) 
+# Convert to V3/4/Assay structure)
+A2N_5.v3 <- Convert_Assay(seurat_object = A2N_5, convert_to = "V3")
+```
+
+```{r}
+# Convert categorical metadata columns to characters for compatibility
+metadata_cols <- c("orig.ident", "RV", "sample_type", "timepoint", "Phase", 
+                   "miQC.keep","seurat_clusters","cell.type")
+A2N_5.v3@meta.data[metadata_cols] <- lapply(A2N_5.v3@meta.data[metadata_cols], as.character)
+# Remove dots from column names to avoid Python issues
+colnames(A2N_5.v3@meta.data) <- str_replace_all(colnames(A2N_5.v3@meta.data), "\\.", "_")
+```
+
+```{r}
+DefaultAssay(A2N_5.v3) <- "RNA"
+fileout <- "/4dpi_A2N2_5.h5Seurat"
+SaveH5Seurat(A2N_5.v3, filename = fileout, overwrite = TRUE)
+Convert(fileout, dest = "h5ad", overwrite = TRUE)
+```

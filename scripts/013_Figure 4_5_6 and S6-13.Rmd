@@ -1,0 +1,837 @@
+---
+title: "figure 5"
+output: html_document
+date: "2025-10-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load dependencies
+The code below loads all dependencies to run the script.
+```{r}
+#| label: load_dependencies
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+suppressPackageStartupMessages({
+# Core Seurat and single-cell packages
+library(Seurat)
+library(SeuratData)
+library(SeuratDisk)
+library(dittoSeq)
+library(Nebulosa)
+library(scCustomize)
+library(qs)
+# Data manipulation & tidyverse
+library(tidyverse)  # includes dplyr, tibble, tidyr, purrr, ggplot2, etc.
+library(magrittr)
+library(forcats)
+# Visualization
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(patchwork)
+library(RColorBrewer)
+library(viridis)
+library(pheatmap)
+library(ComplexHeatmap)
+# Enrichment / annotation
+library(clusterProfiler)
+library(org.Mm.eg.db)
+})
+```
+
+```{r}
+mergeAll <- readRDS("/2wpi_merged_logNorm.rds")
+
+
+
+mergeAll$RV <- factor(mergeAll$RV,levels=c("Control" ,"Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2", "Ascl1SA6Dlx2", "Ascl1WTSA6", "Ascl1WTDlx2", "Ascl1SA6Dlx2_2", "Ascl1SA6Bcl2_mat", "Ascl1SA6Dlx2_mat"))
+mergeAll <- FindClusters(object = mergeAll, resolution = 1)
+mergeAll<- RunUMAP(object = mergeAll, dims = 1:16)
+DimPlot(mergeAll, reduction = "umap", group.by = "RV", shuffle = T) + scale_x_reverse() 
+```
+
+##Figure S6b
+```{r Cluster names, warning = FALSE, message = FALSE}
+Ann_2and4wpi <- RenameIdents(mergeAll,
+`0` = "OPC_like", 
+`1` = "Pyr", 
+`2` = "iNs",
+`3` = "iNs",
+`4` = "Microglia/Macrophages", 
+`5` = "iNs", 
+`6` = "Pyr",
+`7` = "Pyr", 
+`8` = "Astrocytes", 
+`9` = "Pyr",
+`10` = "eInterneurons", 
+`11` = "Astrocytes",
+`12` = "Pericytes/P-derived-iNs", 
+`13` = "Pyr", 
+`14` = "iNs",
+`15` = "Pyr", 
+`16` = "Pyr", 
+`17` = "Arrested_1", 
+`18` = "Oligodendrocytes", 
+`19` = "Arrested_2", 
+`20` = "iNs", 
+`21` = "eInterneurons", 
+`22` = "Oligodendrocytes", 
+`23` = "Pericytes/P-derived-iNs", 
+`24` = "Pyr", 
+`25` = "OPC_like", 
+`26` = "Microglia/Macrophages",
+`27` = "iNs",
+`28` = "Unknown",
+`29` = "Microglia/Macrophages",
+`30` = "Microglia/Macrophages",
+`31` = "OPC_like",
+`32` = "Pyr",
+`33` = "Unknown",
+`34` = "iNs",
+`35` = "Unknown",
+`36` = "Pyr",
+`37` = "Pericytes/P-derived-iNs"
+)
+Ann_2and4wpi <- StashIdent(Ann_2and4wpi, save.name = 'cell.type')
+Ann_2and4wpi[["cell.type"]] <- Idents(object = Ann_2and4wpi)
+Ann_2and4wpi <- subset(Ann_2and4wpi, idents = "Unknown", invert = TRUE)
+
+DimPlot(Ann_2and4wpi, reduction = "umap", group.by = "RV", shuffle = T)+ scale_y_reverse() 
+DimPlot(Ann_2and4wpi, reduction = "umap", group.by = 'cell.type', pt.size = 0.5) + Blank_Theme() + scale_x_reverse() 
+DimPlot(Ann_2and4wpi, reduction = "umap", group.by = 'seurat_clusters', pt.size = 0.5) + Blank_Theme()
+```
+```{r}
+Ann_2and4wpi$RV <- plyr::mapvalues(Ann_2and4wpi$RV,
+                                  from = c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2",  "Ascl1WTSA6", "Ascl1WTDlx2", "Ascl1SA6Dlx2_2", "Ascl1SA6Bcl2_mat", "Ascl1SA6Dlx2_mat"),
+                                  to = c("Control_2wpi", "Ascl1WT_2wpi", "Ascl1WTBcl2_2wpi", "Ascl1SA6_2wpi", "Ascl1SA6Bcl2_2wpi",  "Ascl1WTSA6_2wpi", "Ascl1WTDlx2_2wpi", "Ascl1SA6Dlx2_2wpi", "Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_4wpi"))
+```
+
+
+### processed data from here on is provided: 
+```{r}
+Ann_2and4wpi <- readRDS("2-4wpi_nuclei_annotated.rds")
+```
+
+
+
+### Figure S 11b
+```{r}
+cell_type_colors <- c(
+  "Oligodendrocytes"= "#708090",
+"OPC_like"= "#A7BDD3",
+"Astrocytes"= "#A9D3A9",
+"Arrested_1"= "#8F9D53", 
+"Arrested_2"= "#006400", 
+"iNs"= "#4A5336", 
+"eInterneurons"= "grey",
+"Pyr"= "lightgrey",
+"Microglia/Macrophages"= "#696969", 
+"Pericytes/P-derived-iNs"= "#FFE4E1") 
+
+Ann_2and4wpi@meta.data$cell.type.color <- cell_type_colors[Ann_2and4wpi@meta.data$cell.type]
+DimPlot(object = Ann_2and4wpi,  group.by = "cell.type",  cols = cell_type_colors,label = FALSE,  pt.size = 0.5) & NoLegend() & Blank_Theme()  & scale_x_reverse()
+DimPlot(subset(Ann_2and4wpi, RV == "Control_2wpi"), group.by="cell.type", cols=cell_type_colors, label=FALSE, pt.size=0.5) & NoLegend() & Blank_Theme() & scale_x_reverse()
+
+DimPlot(subset(Ann_2and4wpi, RV %in% c("Control_2wpi","Ascl1WT_2wpi","Ascl1WTBcl2_2wpi","Ascl1SA6_2wpi","Ascl1SA6Bcl2_2wpi","Ascl1WTDlx2_2wpi","Ascl1SA6Dlx2_2wpi","Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_4wpi")), group.by="cell.type", cols=cell_type_colors, label=FALSE, pt.size=0.5, split.by="RV", ncol=5) & NoLegend() & Blank_Theme() & scale_x_reverse()
+
+### correct annotations 
+dittoBarPlot(Ann_2and4wpi, "cell.type", group.by="RV",  x.reorder=c(11,7,8,1,3,5,2,4,6,9,10),  var.labels.reorder=c(2,5,4,1,3,6,7,8,9,10,11)) +  scale_fill_manual(values=c("Oligodendrocytes"="#708090", "OPC_like"="#A7BDD3", "Astrocytes"="#A9D3A9","Intermediate1_iNs"="#90B890", "Intermediate2_iNs"="#779977", "iNs"="#006400", "eInterneurons"="grey", "eGlutNeurons"="lightgrey", "Microglia/Macrophages"="#696969", "VLMC/Pericyte_iNs"="#696969", "Pericytes"="lightgrey"))
+
+```
+
+
+
+### ##Figure S6c
+```{r}
+Ann_2and4wpi$Mscarlet_status <- FetchData(Ann_2and4wpi, vars = "Mscarlet3LTR")[,1]
+Idents(Ann_2and4wpi) <- "Mscarlet3LTR"
+DimPlot(Ann_2and4wpi, group.by = "Mscarlet3LTR", cols = c("gray", "darkred"))  & scale_x_reverse() & Blank_Theme()
+```
+
+#### Subset Astrocyte-2-Neuron for Figure 5b
+```{r Cluster names, warning = FALSE, message = FALSE}
+Idents(Ann_2and4wpi) <- "cell.type"
+print(table(Ann_2and4wpi$RV))
+A2N<-subset(Ann_2and4wpi, idents = c( "Astrocytes","Intermediate1_iNs", "Intermediate2_iNs", "iNs"))
+A2N <- StashIdent(A2N, save.name = 'cell.type')
+A2N[["cell.type"]] <- Idents(object = A2N)
+print(table(A2N$RV))
+Idents(A2N) <- "RV"
+A2Ns_900 <- subset(A2N, downsample=980)
+print(table(A2Ns_900$RV))
+DefaultAssay(object = A2Ns_900) <- "RNA"
+A2Ns_900<- RunPCA(object = A2Ns_900)
+A2Ns_900 <- FindNeighbors(object = A2Ns_900, dims = 1:10) 
+A2Ns_900 <- FindClusters(object = A2Ns_900, resolution = 0.6) #
+A2Ns_900 <- RunUMAP(A2Ns_900, dims = 1:7)
+DimPlot(A2Ns_900, reduction = "umap", group.by = 'cell.type',  cols = cell_type_colors, pt.size = 0.5) + Blank_Theme()& scale_y_reverse() & scale_x_reverse() 
+DimPlot(A2Ns_900, reduction = "umap", cells.highlight = colnames(A2Ns_900[,A2Ns_900$RV=="Control_2wpi"]), cols.highlight = "black") + NoLegend() + Blank_Theme()& scale_x_reverse() & scale_y_reverse() 
+```
+
+```{r}
+A2Ns_900 <- readRDS('/2wpi_logNorm_A2Ns_900.rds')
+```
+
+###. for Figure 4h
+```{r,  fig.width=10, fig.height=4}
+##Interneurons  Arlotta 2021
+data("A2Ns_900")
+interneuron_features <- list(c("Dlx2", "Nrxn3", "Dlx1", "Dlx5", "Meg3", "Rpp25", "Gad2", "Maf", "Dlx6os1", "Arx", "Nxph1", "Lhx6", "Mafb", "Sp9", "Gad1", "Slc32a1", "Npas1", "Nnat", "Elmo1", "Celf4", "Atp1b1", "Gria1", "Gng2", "Gm13889", "Arl4c", "Pcsk1n", "Dcx", "Runx1t1", "Dlgap1", "Nap1l5", "Stmn2", "Tubb2a", "Chl1", "Cdk5r1", "Mapt", "Rtn1", "Ncam1", "Slc6a1", "Gm17750", "Btg1", "Akap7", "Mapk10", "Dact1", "Cux2", "Mef2c", "Fos", "Pfn2", "Mllt11", "Syt1", "Stmn3", "Kcnk2", "Nrep", "Nsg1", "Irf2bpl", "Cacng2", "Cited2", "Snrpn", "Cxx1a", "Dusp26", "Ly6h", "Npy", "Carhsp1", "Thra", "Camk2n1", "Csdc2", "Bcl11b", "Dclk1", "Elavl3", "Ccdc88a", "Zeb2", "Dynll2", "Cirbp", "Scg5", "Xist", "Fxyd6", "Nsg2", "Rab3a", "Tcf4", "Zfp704", "Ina", "Snap25", "Cadm1", "Rbfox2", "Chd3os", "Blcap", "Fam110b", "Stmn4", "Fgf13", "Junb", "Zbtb20", "Ap1s2"))
+
+###module Astrocytes02 Arlotta 2021
+astro_features <- list(c("Ptn", "Aldoc", "Entpd2", "Cldn10", "Gfap", "Ndrg2", "Pla2g7", "Hmgcs2", "Fabp7", "Sepp1", 
+"Cspg5", "Luzp2", "Pea15a", "Sparc", "Cmtm5", "Aqp4", "Ddah1", "Phgdh", "Slc1a3", "Adhfe1", "Fmo1", "Slco1c1", "Hes5", "Mfge8", "Ntrk2", "Cst3", "Ttyh1", "Ptprz1", "Atp1a2", "S100a16", "Slc7a10", "Cxcl14", "Mt3", "Sparcl1", "Gstm1", "Rgs5", "Sfrp1", "Pdgfrb", "Fgfbp3", "Emp2", "Bcan", "Trim47", "Angptl4", "Jun", "Tspan7", "Chil1", "Acot1", "Igfbp5", "Acsbg1", "Cpne4", "Ctsl", "Rgcc", "Tst", "Thrsp", "Dtna", "Cbs", "Abhd4", "AI413582", "Aldh1l1", "Plpp3", "Cyr61", "Eva1a", "Dkk3", "Prdx6", "Pdzph1", "Tmem100", "Mid1ip1", "Gm17750", "Fbln2", "Rlbp1", "Il18", "Slc1a2", "Pon2", "Ppp1r3c", "Vcam1", "Csdc2", "Ramp2", "Glul", "Mmd2", "Car8", "Timp3", "Zfp36l2", "Acaa2", "Slc6a11", "Pdpn", "Fam210b", "Hopx", "Cyp2j9", "Hmgcs1", "Egln3", "Asrgl1", "Trim9", "S100a13", "Prkcdbp", "Pmm1", "Ntm", "Ppp1r1a", "Cd302", "St6galnac5"))
+
+A2Ns_900 <- AddModuleScore(object = A2Ns_900, features = astro_features, ctrl = 5, name = 'Astrocytes')
+A2Ns_900 <- AddModuleScore(object = A2Ns_900, features = interneuron_features, ctrl = 5, name = 'Interneurons')
+p1 <- FeaturePlot(A2Ns_900, features = "Astrocytes1") & scale_colour_gradientn(colours = rev(brewer.pal(n = 11, name = "RdBu")))& scale_y_reverse()& scale_x_reverse()
+p2 <- FeaturePlot(A2Ns_900, features = "Interneurons1") & scale_colour_gradientn(colours = rev(brewer.pal(n = 11, name = "RdBu")))& scale_y_reverse()& scale_x_reverse()
+library(patchwork)
+(p1 | p2) & Blank_Theme()
+
+
+```
+###. for Figure 4e and S8a
+```{r}
+library(patchwork)
+rv <- c("Control_2wpi","Ascl1WT_2wpi","Ascl1WTBcl2_2wpi","Ascl1WTDlx2_2wpi","Ascl1SA6_2wpi","Ascl1SA6Bcl2_2wpi","Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2","Ascl1SA6Dlx2_2wpi", "Ascl1SA6Dlx2_4wpi")
+cols <- c("black","#1E90FF","turquoise","#20B2AA","#FFA07A","#DB7093","#9400D3","#6A5ACD","#98FB98","#32CD32","#00FA9A")
+wrap_plots(lapply(seq_along(rv), function(i) DimPlot(A2Ns_900, reduction="umap", cells.highlight=colnames(A2Ns_900[,A2Ns_900$RV==rv[i]]), cols.highlight=cols[i]) + NoLegend() + Blank_Theme() + scale_x_reverse() + scale_y_reverse()), ncol=4)
+```
+
+
+
+
+###final Volcanoplot for Bcl2 2 verus 4 weeks for Figure S8e
+```{r}
+library(Seurat)
+library(ggplot2)
+library(ggrepel)
+Ascl1SA6Bcl2andDlx2s <- subset(Ann_2and4wpi, subset = RV %in% c("Ascl1SA6Bcl2_2wpi", "Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_2wpi", "Ascl1SA6Dlx2_4wpi"))
+Ascl1SA6Bcl2andDlx2s$RV <- factor(Ascl1SA6Bcl2andDlx2s$RV, levels = c("Ascl1SA6Bcl2_2wpi", "Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_2wpi", "Ascl1SA6Dlx2_4wpi"))
+colors_vector <- c("Ascl1SA6Bcl2_2wpi" = "#9400D3", "Ascl1SA6Bcl2_4wpi" = "#6A5ACD", "Ascl1SA6Dlx2_2wpi" = "#32CD32",  "Ascl1SA6Dlx2_4wpi" = "#00FA9A")
+Ascl1SA6Bcl2andDlx2s@meta.data$RV_colors <- colors_vector[Ascl1SA6Bcl2andDlx2s$RV]
+Ascl1SA6Bcl2andDlx2s <- AddMetaData(Ascl1SA6Bcl2andDlx2s, metadata = Ascl1SA6Bcl2andDlx2s@meta.data$RV_colors, col.name = "RV_colors")
+iNs<-subset(Ascl1SA6Bcl2andDlx2s, idents = c("iNs"))
+# Subset Seurat object to 2wpi and 4wpi
+Ascl1SA6Bcl2s <- subset(iNs, subset = RV %in% c("Ascl1SA6Bcl2_2wpi", "Ascl1SA6Bcl2_4wpi"))
+Ascl1SA6Bcl2s$RV <- factor(Ascl1SA6Bcl2s$RV, levels = c("Ascl1SA6Bcl2_2wpi", "Ascl1SA6Bcl2_4wpi"))
+Idents(Ascl1SA6Bcl2s) <- Ascl1SA6Bcl2s$RV
+
+# Differential expression
+DEG_Ascl1SA6Bcl2s <- FindMarkers(
+  Ascl1SA6Bcl2s,
+  ident.1 = "Ascl1SA6Bcl2_4wpi",
+  ident.2 = "Ascl1SA6Bcl2_2wpi",
+  group.by = "RV",
+  logfc.threshold = 0,
+  min.pct = 0.1
+)
+
+# Replace p_val_adj == 0 to avoid -Inf
+DEG_Ascl1SA6Bcl2s$p_val_adj[DEG_Ascl1SA6Bcl2s$p_val_adj == 0] <- 
+  min(DEG_Ascl1SA6Bcl2s$p_val_adj[DEG_Ascl1SA6Bcl2s$p_val_adj > 0]) / 10
+
+# Label up/downregulated genes
+DEG_Ascl1SA6Bcl2s$diffexpressed <- ifelse(
+  DEG_Ascl1SA6Bcl2s$avg_log2FC > 0.5 & DEG_Ascl1SA6Bcl2s$p_val_adj < 0.05, "UP",
+  ifelse(DEG_Ascl1SA6Bcl2s$avg_log2FC < -0.5 & DEG_Ascl1SA6Bcl2s$p_val_adj < 0.05, "DOWN", "NO")
+)
+
+# Define custom gene list to label
+custom_genes <- c("Sox11", "Hdac9","Ank3","Mapt","Negr1","Scn1a","Scn1a","Kcnd2", "Nnat", "Synpr", "Syt2","Syt1", "Hcn1", "Slc12a5", "Ncam2", "Kalrn", "Taco1")
+DEG_Ascl1SA6Bcl2s$delabel <- ifelse(rownames(DEG_Ascl1SA6Bcl2s) %in% custom_genes, rownames(DEG_Ascl1SA6Bcl2s), NA)
+
+# Full volcano plot, labels only for genes in list
+ggplot(DEG_Ascl1SA6Bcl2s, aes(avg_log2FC, -log10(p_val_adj))) +
+  geom_point(aes(color = diffexpressed), size = 2.5, alpha = 0.4) +  # set transparency here
+  scale_color_manual(values = c(DOWN = "#9400D3", NO = "grey", UP = "#6A5ACD")) +
+  geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", color = "gray") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray") +
+  geom_text_repel(
+    aes(label = delabel),
+    color = "black",
+    size = 6,
+    box.padding = 4.5,
+    point.padding = 0.5,
+    max.overlaps = Inf,
+    segment.size = 0.7,
+    segment.color = "darkgrey",
+    min.segment.length = 0,
+    segment.curvature = 0,
+    force = 5
+  ) +
+  labs(x = "log2 Fold Change", y = "-log10(p-adj)", title = "Volcano Plot: Ascl1SA6Dlx2 4wpi vs 2wpi") +
+  theme_minimal(base_family = "Arial") +
+  theme(
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(color = "black"),
+    plot.title = element_text(color = "black"),
+    legend.position = "none"
+  )
+```
+###final Volcanoplot for Dlx2 2 verus 4 wekks for Figure S8f
+```{r}
+library(Seurat)
+library(ggplot2)
+library(ggrepel)
+
+# Subset Seurat object to 2wpi and 4wpi
+Ascl1SA6Dlx2s <- subset(iNs, subset = RV %in% c("Ascl1SA6Dlx2_2wpi", "Ascl1SA6Dlx2_4wpi"))
+Ascl1SA6Dlx2s$RV <- factor(Ascl1SA6Dlx2s$RV, levels = c("Ascl1SA6Dlx2_2wpi", "Ascl1SA6Dlx2_4wpi"))
+Idents(Ascl1SA6Dlx2s) <- Ascl1SA6Dlx2s$RV
+
+# Differential expression
+DEG_Ascl1SA6Dlx2s <- FindMarkers(
+  Ascl1SA6Dlx2s,
+  ident.1 = "Ascl1SA6Dlx2_4wpi",
+  ident.2 = "Ascl1SA6Dlx2_2wpi",
+  group.by = "RV",
+  logfc.threshold = 0,
+  min.pct = 0.1
+)
+
+# Replace p_val_adj == 0 to avoid -Inf
+DEG_Ascl1SA6Dlx2s$p_val_adj[DEG_Ascl1SA6Dlx2s$p_val_adj == 0] <- 
+  min(DEG_Ascl1SA6Dlx2s$p_val_adj[DEG_Ascl1SA6Dlx2s$p_val_adj > 0]) / 10
+
+# Label up/downregulated genes
+DEG_Ascl1SA6Dlx2s$diffexpressed <- ifelse(
+  DEG_Ascl1SA6Dlx2s$avg_log2FC > 0.5 & DEG_Ascl1SA6Dlx2s$p_val_adj < 0.05, "UP",
+  ifelse(DEG_Ascl1SA6Dlx2s$avg_log2FC < -0.5 & DEG_Ascl1SA6Dlx2s$p_val_adj < 0.05, "DOWN", "NO")
+)
+
+# Define custom gene list to label
+custom_genes <- c("Sox11","Slc25a3","Ank3","Mapt","Mecp2","Negr1","Prickle1","Scn1a","Kcnd2","Gria4", "Malat1", "Miat", "Cacna1c", "Nav1", "Elavl3", "Dlx1", "Stmn1")
+DEG_Ascl1SA6Dlx2s$delabel <- ifelse(rownames(DEG_Ascl1SA6Dlx2s) %in% custom_genes, rownames(DEG_Ascl1SA6Dlx2s), NA)
+
+# Full volcano plot, labels only for genes in list
+ggplot(DEG_Ascl1SA6Dlx2s, aes(avg_log2FC, -log10(p_val_adj), color = diffexpressed)) +
+  geom_point(aes(alpha = diffexpressed), size = 2.5) +
+  scale_color_manual(values = c(DOWN = "#32CD32", NO = "grey", UP = "#00FA9A")) +
+  scale_alpha_manual(values = c(DOWN = 0.2, NO = 0.4, UP = 0.6)) +
+  geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", color = "gray") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray") +
+  geom_text_repel(
+    aes(label = delabel),
+    color = "black",
+    size = 6,
+    box.padding = 2.5,
+    point.padding = 0.5,
+    max.overlaps = Inf,
+    segment.size = 0.7,
+    segment.color = "darkgrey"
+  ) +
+  labs(x = "log2 Fold Change", y = "-log10(p-adj)", 
+       title = "Volcano Plot: Ascl1SA6Dlx2 4wpi vs 2wpi") +
+  theme_minimal(base_family = "Arial") +
+  theme(
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(color = "black"),
+    plot.title = element_text(color = "black"),
+    legend.position = "none"
+  )
+```
+### Volcanoplot for comparison Bcl2 and Dlx2 at 4 wpi Figure S8
+```{r}
+library(Seurat)
+library(ggplot2)
+library(ggrepel)
+
+# Subset Seurat object to 2wpi and 4wpi
+comparison_4wpi <- subset(iNs, subset = RV %in% c("Ascl1SA6Dlx2_4wpi", "Ascl1SA6Bcl2_4wpi"))
+comparison_4wpi$RV <- factor(comparison_4wpi$RV, levels = c("Ascl1SA6Dlx2_4wpi", "Ascl1SA6Bcl2_4wpi"))
+Idents(comparison_4wpi) <- comparison_4wpi$RV
+
+# Differential expression
+DEG_comparison_4wpi <- FindMarkers(
+  comparison_4wpi,
+  ident.2 = "Ascl1SA6Bcl2_4wpi",
+  ident.1 = "Ascl1SA6Dlx2_4wpi",
+  group.by = "RV",
+  logfc.threshold = 0,
+  min.pct = 0.1
+)
+
+# Replace p_val_adj == 0 to avoid -Inf
+DEG_comparison_4wpi$p_val_adj[DEG_comparison_4wpi$p_val_adj == 0] <- 
+  min(DEG_comparison_4wpi$p_val_adj[DEG_comparison_4wpi$p_val_adj > 0]) / 10
+
+# Label up/downregulated genes
+DEG_comparison_4wpi$diffexpressed <- ifelse(
+  DEG_comparison_4wpi$avg_log2FC > 0.5 & DEG_comparison_4wpi$p_val_adj < 0.05, "UP",
+  ifelse(DEG_comparison_4wpi$avg_log2FC < -0.5 & DEG_comparison_4wpi$p_val_adj < 0.05, "DOWN", "NO")
+)
+
+# Define custom gene list to label
+custom_genes <- c("Scn1a","Scn1a","Synpr", "Hcn1","Slc4a4", "Fgf13" , "Chrna7" , "Cntn4" , "Gad2" , "Cacna1a","Nav2", "Shisa9", "Cntn5", "Dlx6os1", "Unc13c", "Gabrg3", "Kalrn", "March1", "Robo1", "Hs3st5", "Me3", "Ptprm", "Slc6a1")
+DEG_comparison_4wpi$delabel <- ifelse(rownames(DEG_comparison_4wpi) %in% custom_genes, rownames(DEG_comparison_4wpi), NA)
+
+# Full volcano plot, labels only for genes in list
+ggplot(DEG_comparison_4wpi, aes(avg_log2FC, -log10(p_val_adj), color = diffexpressed)) +
+  geom_point(aes(alpha = diffexpressed), size = 2.5) +
+  scale_color_manual(values = c(UP = "#00FA9A", NO = "grey", DOWN = "#6A5ACD")) +
+  scale_alpha_manual(values = c(UP = 0.6, NO = 0.4, DOWN = 0.2)) +
+  geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", color = "gray") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray") +
+  geom_text_repel(
+    aes(label = delabel),
+    color = "black",
+    size = 6,
+    box.padding = 4.5,
+    point.padding = 0.5,
+    max.overlaps = Inf,
+    segment.size = 0.7,
+    segment.color = "darkgrey",
+    min.segment.length = 0,
+    segment.curvature = 0,
+    force = 5 
+  ) +
+  labs(x = "log2 Fold Change", y = "-log10(p-adj)", 
+       title = "Volcano Plot: Ascl1SA6Dlx2 4wpi vs 2wpi") +
+  theme_minimal(base_family = "Arial") +
+  theme(
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(color = "black"),
+    plot.title = element_text(color = "black"),
+    legend.position = "none"
+  )
+
+```
+
+## Data Preparation for Figures 
+```{r}
+nucleiReference_ann <- readRDS('/nucleiReference_integrated_annotated_Petros,Allaway.rds')
+
+Ann_2and4wpi <- readRDS('/2wpi_merged_logNorm_annotated.rds')
+SA6<- subset(Ann_2and4wpi, subset = RV %in% c("Ascl1SA6_2wpi","Ascl1SA6Bcl2_2wpi", "Ascl1SA6Dlx2_2wpi", "Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_4wpi"))
+
+iNs <- subset(SA6, subset = cell.type %in% c( "iNs"))
+
+cGlutNeurons <- subset(Ann_2and4wpi, subset = cell.type %in% c("eGlutNeurons"))
+iNs$cell.type <- droplevels(iNs$cell.type)
+cGlutNeurons$cell.type <- droplevels(cGlutNeurons$cell.type)
+levels(iNs$cell.type)
+
+iNs<- subset(iNs, subset = RV %in% c("Ascl1SA6_2wpi","Ascl1SA6Bcl2_2wpi", "Ascl1SA6Dlx2_2wpi", "Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_4wpi"))
+iNs$sample <- "iNs"
+nucleiReference_ann$sample <- "nucleiReference_ann"
+cGlutNeurons$sample <- "cGlutNeurons"
+brain <- merge(nucleiReference_ann, y = list(iNs,cGlutNeurons), add.cell.ids = c("nucleiReference_ann", "iNs", "cGlutNeurons"), project = "merge")
+remove(iNs, nucleiReference_ann,cGlutNeurons,SA6)
+brain[["RNA"]] <- JoinLayers(brain[["RNA"]]) 
+Ascl1SA6Bcl2_2wpi <- subset(brain, subset = RV == "Ascl1SA6Bcl2_2wpi" & cell.type == "iNs")
+Ascl1SA6Bcl2_2wpi$sample <- "Ascl1SA6Bcl2_2wpi"
+Ascl1SA6Dlx2_2wpi <- subset(brain, subset = RV == "Ascl1SA6Dlx2_2wpi" & cell.type == "iNs")
+Ascl1SA6Dlx2_2wpi$sample <- "Ascl1SA6Dlx2_2wpi"
+Ascl1SA6Bcl2_4wpi <- subset(brain, subset = RV == "Ascl1SA6Bcl2_4wpi" & cell.type == "iNs")
+Ascl1SA6Bcl2_4wpi$sample <- "Ascl1SA6Bcl2_4wpi"
+Ascl1SA6Dlx2_4wpi <- subset(brain, subset = RV == "Ascl1SA6Dlx2_4wpi" & cell.type == "iNs")
+Ascl1SA6Dlx2_4wpi$sample <- "Ascl1SA6Dlx2_4wpi"
+Ascl1SA6_2wpi <- subset(brain, subset = RV == "Ascl1SA6_2wpi" & cell.type == "iNs")
+Ascl1SA6_2wpi$sample <- "Ascl1SA6_2wpi"
+
+# Subset interneurons from brain (already split by age above)
+Vip_P10 <- subset(brain, subset = paper == "lee2022" & age == "P10" & cell.type == "Vip")
+Vip_P10$sample <- "Vip_P10"
+Vip_P28 <- subset(brain, subset = paper == "lee2022" & age == "P28" & cell.type == "Vip")
+Vip_P28$sample <- "Vip_P28"
+Sst_P10 <- subset(brain, subset = paper == "lee2022" & age == "P10" & cell.type == "Sst")
+Sst_P10$sample <- "Sst_P10"
+Sst_P28 <- subset(brain, subset = paper == "lee2022" & age == "P28" & cell.type == "Sst")
+Sst_P28$sample <- "Sst_P28"
+Pvalb_P10 <- subset(brain, subset = paper == "lee2022" & age == "P10" & cell.type == "Pvalb")
+Pvalb_P10$sample <- "Pvalb_P10"
+Pvalb_P28 <- subset(brain, subset = paper == "lee2022" & age == "P28" & cell.type == "Pvalb")
+Pvalb_P28$sample <- "Pvalb_P28"
+Lamp5_P10 <- subset(brain, subset = paper == "lee2022" & age == "P10" & cell.type == "Lamp5")
+Lamp5_P10$sample <- "Lamp5_P10"
+Lamp5_P28 <- subset(brain, subset = paper == "lee2022" & age == "P28" & cell.type == "Lamp5")
+Lamp5_P28$sample <- "Lamp5_P28"
+
+# Merge all subsets into one Seurat object
+Neurons_1 <- merge(Ascl1SA6_2wpi, y = list(Ascl1SA6Bcl2_2wpi, Ascl1SA6Bcl2_4wpi,Ascl1SA6Dlx2_2wpi, Ascl1SA6Dlx2_4wpi, Pvalb_P10, Pvalb_P28, Sst_P10, Sst_P28, Vip_P10, Vip_P28, Lamp5_P10, Lamp5_P28), add.cell.ids = c("Ascl1SA6_2wpi","Ascl1SA6Bcl2_2wpi","Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_2wpi",  "Ascl1SA6Dlx2_4wpi","Pvalb_P10", "Pvalb_P28", "Sst_P10", "Sst_P28", "Vip_P10", "Vip_P28", "Lamp5_P10", "Lamp5_P28"), project = "merge")
+
+# Clean up unused objects from environment if needed
+rm(Ascl1SA6Bcl2_2wpi, Ascl1SA6Dlx2_2wpi, Ascl1SA6Bcl2_4wpi, Ascl1SA6Dlx2_4wpi,Ascl1SA6_2wpi,  Vip_P10, Vip_P28, Sst_P10, Sst_P28, Meis2, Pvalb_P10, Pvalb_P28, Lamp5_P10, Lamp5_P28, cGlutNeurons, nucleiReference_ann, Ann_2and4wpi, SA6, iNs, brain)
+
+Idents(Neurons_1) <- "sample"
+print(table(Neurons_1$sample))
+Neurons <- subset(Neurons_1, downsample = 430)
+print(table(Neurons$sample))
+Neurons[["RNA"]] <- JoinLayers(Neurons[["RNA"]])
+remove(Neurons_1)
+```
+
+### Vlnplots for Figure 4g
+```{r}
+Neurons$sample <- factor(Neurons$sample, levels = c( "Ascl1SA6Bcl2_2wpi","Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_2wpi","Ascl1SA6Dlx2_4wpi","Pvalb_P10","Pvalb_P28","Sst_P10","Sst_P28","Vip_P10","Vip_P28","Lamp5_P10","Lamp5_P28"))
+Neurons$sample2 <- Neurons$sample
+Neurons$sample2[Neurons$sample %in% c("Vip_P10","Sst_P10","Pvalb_P10","Lamp5_P10")] <- "P10_Interneurons"
+Neurons$sample2[Neurons$sample %in% c("Vip_P28","Sst_P28","Pvalb_P28","Lamp5_P28")] <- "P28_Interneurons"
+Neurons_mature <- subset(Neurons, subset = sample2 %in% c("Ascl1SA6Bcl2_2wpi","Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_2wpi","Ascl1SA6Dlx2_4wpi","P10_Interneurons","P28_Interneurons"))
+Idents(Neurons_mature) <- "sample2"
+#mature_plot <- c("Sox11","Dcx","Mapt","Scn3a","Myo16","Pfkp","Slc12a5","Kcnc1","Snap25","Malat1","Rasgrf1","Cit")
+mature_plot <- c("Sox11","Dcx","Mapt","Pfkp","Slc12a5","Snap25","Malat1","Rasgrf1")
+my_colors <- c("#9400D3","#6A5ACD","#32CD32","#00FA9A","#EEEEEE","darkgrey")
+VlnPlot(Neurons_mature, features=intersect(mature_plot, rownames(Neurons_mature)), group.by="sample2", fill.by="ident", stack=TRUE, flip=TRUE, pt.size=0, cols=my_colors) +
+  NoLegend() + ylab("Expression") + ggtitle("Mature Gene Expression") +
+  theme(panel.grid=element_blank(), panel.border=element_rect(color="black", fill=NA))
+```
+
+### Vlnplots   (Endogenous Neurons, Allaway et al., 2021)
+```{r}
+Neurons$sample <- factor(Neurons$sample, levels = c( "Ascl1SA6Bcl2_2wpi","Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_2wpi","Ascl1SA6Dlx2_4wpi","Pvalb_P10","Pvalb_P28","Sst_P10","Sst_P28","Vip_P10","Vip_P28","Lamp5_P10","Lamp5_P28"))
+plot_gene_group <- function(genes, title){
+  samples_to_plot <- c("Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_4wpi",  "Vip_P28", "Pvalb_P28", "Sst_P28", "Lamp5_P28")
+  genes <- intersect(genes, rownames(Neurons))
+  VlnPlot(Neurons[, Neurons$sample %in% samples_to_plot], features=genes, group.by="sample", fill.by="ident", stack=TRUE, flip=TRUE, pt.size=0, cols=my_colors) +
+    NoLegend() + ylab("Gene Name") + ggtitle(title) + theme(panel.grid=element_blank(), panel.border=element_rect(color="black", fill=NA))
+}
+my_colors <- c("#6A5ACD","#00FA9A","#A88BB3","#C9B08A","#9BB199","#8BAAC0")
+Tog_select <- c("Syt2","Slc4a4","Etv6","Fgf13","Chrna7","Hs3st5" )
+plot_gene_group(Tog_select,"")
+```
+
+
+###For Figure S6a
+```{r}
+library(Seurat)
+library(patchwork)
+
+# Define genes to plot
+genes <- c(
+ "Aldh1l1","Aqp4",           # Astro
+  "Sox10","Olig2","Pdgfra", # OPCs
+   "Mog",  # Oligodendrocytes
+  "Itgam", # Microglia
+  "Pdgfrb" ,  # Pericytes
+  "Top2a","Mki67",     # Cycling
+ "Sox11", "Dcx", "Rbfox3","Srrm4","Myt1l", "Prox1", "Lhx6")
+
+# Colors: grey for low expression, black for high
+low_color <- "#D9D9D9"
+high_color <- "#000000"
+
+plots <- lapply(genes, function(gene) {
+  FeaturePlot(
+    Ann_2and4wpi, features = gene, reduction = "umap",
+    cols = c(low_color, high_color), max.cutoff = 1.5
+  ) + theme_void()
+})
+
+wrap_plots(plots, ncol = 7)& scale_x_reverse() 
+
+```
+
+###For Extended data fig 6b
+```{r}
+cell_type_colors <- c(
+  "Oligodendrocytes"= "#708090",
+"OPC_like"= "#A7BDD3",
+"Astrocytes"= "#A9D3A9",
+"Arrested_1"= "#8F9D53", 
+"Arrested_2"= "#006400", 
+"iNs"= "#4A5336", 
+"eInterneurons"= "grey",
+"Pyr"= "lightgrey",
+"Microglia/Macrophages"= "#696969", 
+"Pericytes/P-derived-iNs"= "#FFE4E1") 
+
+Ann_2and4wpi@meta.data$cell.type.color <- cell_type_colors[Ann_2and4wpi@meta.data$cell.type]
+
+DimPlot(object = Ann_2and4wpi,  group.by = "cell.type",  cols = cell_type_colors,label = FALSE,  pt.size = 0.5) & NoLegend() & Blank_Theme() & scale_x_reverse() 
+DimPlot(object = Ann_2and4wpi,  group.by = "RV",  pt.size = 0.5) & scale_x_reverse() 
+DimPlot(subset(Ann_2and4wpi, RV == "Control_2wpi"), group.by="cell.type", cols=cell_type_colors, label=TRUE, pt.size=0.5) & NoLegend() & Blank_Theme() & scale_x_reverse()
+
+```
+
+
+##for Extended dATA 
+```{r}
+cell_type_colors <- c(
+  "Oligodendrocytes"= "#708090",
+"OPC_like"= "#A7BDD3",
+"Astrocytes"= "#A9D3A9",
+"Arrested_1"= "#8F9D53", 
+"Arrested_2"= "#006400", 
+"iNs"= "#4A5336", 
+"eInterneurons"= "grey",
+"Pyr"= "lightgrey",
+"Microglia/Macrophages"= "#696969", 
+"Pericytes/P-derived-iNs"= "#FFE4E1") 
+
+Ann_2and4wpi@meta.data$cell.type.color <- cell_type_colors[Ann_2and4wpi@meta.data$cell.type]
+
+DimPlot(object = Ann_2and4wpi,  group.by = "cell.type",  cols = cell_type_colors,label = FALSE,  pt.size = 0.5) & NoLegend() & Blank_Theme()  & scale_x_reverse()
+DimPlot(object = Ann_2and4wpi,  group.by = "cell.type",  cols = cell_type_colors,label = FALSE,  pt.size = 0.5, split.by = "RV", ncol = 5) & NoLegend() & Blank_Theme()  & scale_x_reverse()
+
+Ann_2and4wpi_filtered <- subset(Ann_2and4wpi, RV != "Ascl1WTSA6_2wpi")
+
+
+
+### Pseudotime Lineages (slingshot) Extended Data Figure 13c
+```
+```{r}
+library(slingshot)
+library(purrr) 
+library(ggpubr)
+library(viridis)
+library(ggplot2)
+A2Ns_900 <- JoinLayers(A2Ns_900)
+sce <- as.SingleCellExperiment(A2Ns_900, assay = "RNA")
+sce_cl3 <- slingshot(sce, clusterLabels = "seurat_clusters",  approx_points = 200,  extend = "n",  reducedDim = "UMAP")
+slingLineages(sce_cl3)
+A2Ns_900$Pseudotime_1 <- sce_cl3$slingPseudotime_1
+A2Ns_900$Pseudotime_2 <- sce_cl3$slingPseudotime_2
+A2Ns_900$Pseudotime_3 <- sce_cl3$slingPseudotime_3
+DefaultAssay(A2Ns_900) <- "RNA" 
+plots <- map(1:3, ~ {
+  lineage_nb <- str_c("Pseudotime_", .x)
+  p <- FeaturePlot( A2Ns_900, features = lineage_nb,  reduction = "umap") &
+    scale_colour_viridis() & Blank_Theme() & scale_x_reverse() & scale_y_reverse() 
+  curve_data <- slingCurves(sce_cl3)[[.x]]
+  curve_df <- as.data.frame(curve_data$s[curve_data$ord, ])
+  colnames(curve_df) <- c("umap_1", "umap_2")
+  p + geom_path(data = curve_df, aes(x = umap_1, y = umap_2), inherit.aes = FALSE) 
+})
+ggarrange(plotlist = plots, ncol = 3, nrow = 1) 
+
+```
+
+##### Boxplot, Interneuronal Module Score (Di Bella et al., 2021) of iNs and endogenous Neurons for Figure S8i
+
+```{r module Interneurons Arlotta 2021, fig.height= 6, fig.width=3}
+Ascl1SA6Bcl2andDlx2s <- subset(Ann_2and4wpi, subset = RV %in% c("Ascl1SA6Bcl2_2wpi", "Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_2wpi", "Ascl1SA6Dlx2_4wpi"))
+Ascl1SA6Bcl2andDlx2s$group <- NA
+Ascl1SA6Bcl2andDlx2s$group[Cells(subset(Ascl1SA6Bcl2andDlx2s, subset = cell.type == "iNs" & RV == "Ascl1SA6Bcl2_4wpi"))] <- "iNs_Ascl1SA6Bcl2_4wpi"
+Ascl1SA6Bcl2andDlx2s$group[Cells(subset(Ascl1SA6Bcl2andDlx2s, subset = cell.type == "iNs" & RV == "Ascl1SA6Dlx2_2wpi"))] <- "iNs_Ascl1SA6Dlx2_2wpi"
+Ascl1SA6Bcl2andDlx2s$group[Cells(subset(Ascl1SA6Bcl2andDlx2s, subset = cell.type == "iNs" & RV == "Ascl1SA6Bcl2_2wpi"))] <- "iNs_Ascl1SA6Bcl2_2wpi"
+Ascl1SA6Bcl2andDlx2s$group[Cells(subset(Ascl1SA6Bcl2andDlx2s, subset = cell.type == "iNs" & RV == "Ascl1SA6Dlx2_4wpi"))] <- "iNs_Ascl1SA6Dlx2_4wpi"
+Ascl1SA6Bcl2andDlx2s$group[Cells(subset(Ascl1SA6Bcl2andDlx2s, subset = cell.type == "eGlutNeurons"))] <- "cGlutNeurons"
+#Ascl1SA6Bcl2andDlx2s$group[Cells(subset(Ascl1SA6Bcl2andDlx2s, subset = cell.type == "eInterneurons"))] <- "eInterneurons"
+Ascl1SA6Bcl2andDlx2s$group[ Cells(subset(Ascl1SA6Bcl2andDlx2s, subset = cell.type == "eInterneurons" & wpi == "2wpi"))] <- "cInterneurons_P19"
+Ascl1SA6Bcl2andDlx2s$group[ Cells(subset(Ascl1SA6Bcl2andDlx2s, subset = cell.type == "eInterneurons" & wpi == "4wpi"))] <- "cInterneurons_P30"
+cGlutNeurons <- subset(Ascl1SA6Bcl2andDlx2s, subset = group== "cGlutNeurons")
+#eInterneurons <- subset(Ascl1SA6Bcl2andDlx2s, subset = group== "eInterneurons")
+cInterneurons_P19 <- subset(Ascl1SA6Bcl2andDlx2s, subset = group== "cInterneurons_P19")
+cInterneurons_P30 <- subset(Ascl1SA6Bcl2andDlx2s, subset = group== "cInterneurons_P30")
+iNs_Ascl1SA6Bcl2_4wpi <- subset(Ascl1SA6Bcl2andDlx2s, subset = group== "iNs_Ascl1SA6Bcl2_4wpi")
+iNs_Ascl1SA6Dlx2_2wpi <- subset(Ascl1SA6Bcl2andDlx2s, subset = group== "iNs_Ascl1SA6Dlx2_2wpi")
+iNs_Ascl1SA6Bcl2_2wpi <- subset(Ascl1SA6Bcl2andDlx2s, subset = group== "iNs_Ascl1SA6Bcl2_2wpi")
+iNs_Ascl1SA6Dlx2_4wpi <- subset(Ascl1SA6Bcl2andDlx2s, subset = group== "iNs_Ascl1SA6Dlx2_4wpi")
+SA6_iNs_end_mat <- merge(cGlutNeurons, y = c(iNs_Ascl1SA6Bcl2_4wpi, iNs_Ascl1SA6Dlx2_2wpi, iNs_Ascl1SA6Bcl2_2wpi, iNs_Ascl1SA6Dlx2_4wpi,cInterneurons_P19, cInterneurons_P30), add.cell.ids = c( "cInterneurons_P19", "cInterneurons_P30", "iNs_Ascl1SA6Bcl2_4wpi", "iNs_Ascl1SA6Dlx2_2wpi", "iNs_Ascl1SA6Bcl2_2wpi", "iNs_Ascl1SA6Dlx2_4wpi","cGlutNeurons",),  project = "merge")
+SA6_iNs_end_mat$group <- factor(SA6_iNs_end_mat$group, levels = c("iNs_Ascl1SA6Bcl2_2wpi","iNs_Ascl1SA6Dlx2_2wpi","iNs_Ascl1SA6Bcl2_4wpi","iNs_Ascl1SA6Dlx2_4wpi",  "cInterneurons_P19", "cInterneurons_P30","cGlutNeurons"))
+remove("cGlutNeurons", "cInterneurons", "iNs_Ascl1SA6Bcl2_4wpi", "iNs_Ascl1SA6Dlx2_2wpi", "iNs_Ascl1SA6Bcl2_2wpi", "iNs_Ascl1SA6Dlx2_4wpi")
+SA6_iNs_end_mat<- JoinLayers(object = SA6_iNs_end_mat, verbose = TRUE)
+
+##
+cd_features <- list(c("Dlx2", "Nrxn3", "Dlx1", "Dlx5", "Meg3", "Rpp25", "Gad2", "Maf", "Dlx6os1", "Arx", "Nxph1", "Lhx6", "Mafb", "Sp9", "Gad1", "Slc32a1", "Npas1", "Nnat", "Elmo1", "Celf4", "Atp1b1", "Gria1", "Gng2", "Gm13889", "Arl4c", "Pcsk1n", "Dcx", "Runx1t1", "Dlgap1", "Nap1l5", "Stmn2", "Tubb2a", "Chl1", "Cdk5r1", "Mapt", "Rtn1", "Ncam1", "Slc6a1", "Gm17750", "Btg1", "Akap7", "Mapk10", "Dact1", "Cux2", "Mef2c", "Fos", "Pfn2", "Mllt11", "Syt1", "Stmn3", "Kcnk2", "Nrep", "Nsg1", "Irf2bpl", "Cacng2", "Cited2", "Snrpn", "Cxx1a", "Dusp26", "Ly6h", "Npy", "Carhsp1", "Thra", "Camk2n1", "Csdc2", "Bcl11b", "Dclk1", "Elavl3", "Ccdc88a", "Zeb2", "Dynll2", "Cirbp", "Scg5", "Xist", "Fxyd6", "Nsg2", "Rab3a", "Tcf4", "Zfp704", "Ina", "Snap25", "Cadm1", "Rbfox2", "Chd3os", "Blcap", "Fam110b", "Stmn4", "Fgf13", "Junb", "Zbtb20", "Ap1s2"))
+SA6_iNs_end_mat <- AddModuleScore(SA6_iNs_end_mat, features = cd_features, ctrl = 5, name = 'Interneurons')
+Idents(SA6_iNs_end_mat) <- "group"
+boxplot_obj1 <- SCpubr::do_BoxPlot(SA6_iNs_end_mat, "Interneurons1", group.by = "group") + scale_fill_manual(values = c(
+  "iNs_Ascl1SA6Bcl2_2wpi" = "#9400D3","iNs_Ascl1SA6Bcl2_4wpi" = "#6A5ACD", "iNs_Ascl1SA6Dlx2_2wpi" = "#32CD32","iNs_Ascl1SA6Dlx2_4wpi" = "#00FA9A", "cInterneurons_P30" = "darkgrey", "cInterneurons_P19" = "darkgrey","cGlutNeurons" = "grey"))
+
+boxplot_obj1 <- SCpubr::do_BoxPlot(SA6_iNs_end_mat, "Interneurons1", group.by = "group") +
+  scale_fill_manual(values = c( "iNs_Ascl1SA6Bcl2_2wpi"="#9400D3","iNs_Ascl1SA6Bcl2_4wpi"="#6A5ACD", "iNs_Ascl1SA6Dlx2_2wpi"="#32CD32","iNs_Ascl1SA6Dlx2_4wpi"="#00FA9A", "cInterneurons_P30"="darkgrey","cInterneurons_P19"="darkgrey","cGlutNeurons"="grey"
+  )) + scale_x_discrete(labels=c( cInterneurons_P30="cortical_Interneurons_P30",cInterneurons_P19="cortical_Interneurons_P19",cGlutNeurons="Pyr" ))
+boxplot_obj1
+
+```
+
+###  Figure S9
+```{r}
+Neurons$sample <- factor(Neurons$sample, levels = c( "Ascl1SA6Bcl2_2wpi","Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_2wpi","Ascl1SA6Dlx2_4wpi","Pvalb_P10","Pvalb_P28","Sst_P10","Sst_P28","Vip_P10","Vip_P28","Lamp5_P10","Lamp5_P28"))
+plot_gene_group <- function(genes, title){
+  samples_to_plot <- c("Ascl1SA6Bcl2_2wpi", "Ascl1SA6Dlx2_2wpi",  "Vip_P28", "Pvalb_P28", "Sst_P28", "Lamp5_P28")
+  genes <- intersect(genes, rownames(Neurons))
+  VlnPlot(Neurons[, Neurons$sample %in% samples_to_plot], features=genes, group.by="sample", fill.by="ident", stack=TRUE, flip=TRUE, pt.size=0, cols=my_colors) +
+    NoLegend() + ylab("Gene Name") + ggtitle(title) +
+    theme(panel.grid=element_blank(), panel.border=element_rect(color="black", fill=NA))
+}
+my_colors <- c("#6A5ACD","#00FA9A","#A88BB3","#C9B08A","#9BB199","#8BAAC0")
+Plot_Bcl2 <- c("Syt2","Slc35f3","Slc4a4","Etv6","Scn1a","Grm3","Hcn1","Gabrg3","Nav2","Shisa9","Cntn5","Cdc42","Kcnc1","Zfp385b","Ncam2","Unc5d","Adcy2","Sptb","Etl4","Prkca","Trpc4","Alcam","Syp", "Calm1")
+Plot_Dlx2 <- c("Fgf13","Chrna7","Hs3st5","Kalrn" ,"Dlx6os1", "Cacna1a" ,"Robo1" ,"Ptprm","Slc6a1", "Unc13c","Grik3","Stxbp6","Cacna1g","Gas6","Cntn4","Synpr","Sox2ot","Robo2","Shtn1","Cntn6","Gab2","Epha6","Unc5c","Camk2a","Gad2")
+plot_gene_group(Plot_Bcl2, "Up in SA6-Bcl2 4wpi")
+plot_gene_group(Plot_Dlx2, "Up in SA6-Dlx2 4wpi")
+```
+
+
+####  Figure S9
+```{r}
+library(Seurat); library(clusterProfiler); library(org.Mm.eg.db); library(ggplot2); library(dplyr)
+
+m1 <- FindMarkers(Ascl1SA6Dlx2s, ident.1 = "Ascl1SA6Dlx2_4wpi", ident.2 = "Ascl1SA6Dlx2_2wpi", group.by = "RV", only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+m2 <- FindMarkers(Ascl1SA6Bcl2s, ident.1 = "Ascl1SA6Bcl2_4wpi", ident.2 = "Ascl1SA6Bcl2_2wpi", group.by = "RV", only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+e1 <- bitr(rownames(m1), fromType = "SYMBOL", toType = "ENTREZID", OrgDb = org.Mm.eg.db)
+e2 <- bitr(rownames(m2), fromType = "SYMBOL", toType = "ENTREZID", OrgDb = org.Mm.eg.db)
+go1 <- enrichGO(e1$ENTREZID, OrgDb = org.Mm.eg.db, ont = "BP", pvalueCutoff = 0.05, readable = TRUE)
+go2 <- enrichGO(e2$ENTREZID, OrgDb = org.Mm.eg.db, ont = "BP", pvalueCutoff = 0.05, readable = TRUE)
+
+go_interest <- c(
+  "GO:0031175", # neuron projection development
+  "GO:0007409", # axonogenesis
+  "GO:0016358", # dendrite development
+  "GO:0048812", # neuron projection morphogenesis
+  "GO:0001764", # neurite morphogenesis
+  "GO:0050770", # regulation of axonogenesis
+  "GO:0050773", # regulation of dendrite development
+  "GO:0010975", # regulation of neuron projection development
+  "GO:0097485", # neuron projection guidance
+  "GO:0106027", # neuron projection organization
+  
+  # Synapse Formation & Function
+  "GO:0050808", # synapse organization
+  "GO:0007416", # synapse assembly
+  "GO:0099173", # postsynapse organization
+  "GO:0050807", # regulation of synapse organization
+  "GO:0050803", # regulation of synapse structure or activity
+  "GO:0048167", # regulation of synaptic plasticity
+  "GO:0099003", # vesicle-mediated transport in synapse
+  "GO:0007269", # neurotransmitter secretion
+  "GO:0006836", # neurotransmitter transport
+  "GO:0099565", # chemical synaptic transmission, postsynaptic
+  "GO:0051932", # synaptic transmission, GABAergic
+  "GO:0007214", # gamma-aminobutyric acid signaling pathway
+  
+  # Electrophysiology & Integration
+  "GO:0019228", # neuronal action potential
+  "GO:0060078", # regulation of postsynaptic membrane potential
+  "GO:0099536", # synaptic signaling
+  
+  # General Neuronal Maturation Processes
+  "GO:0042551", # neuron maturation
+  "GO:0030182", # neuron differentiation
+  "GO:0048699", # generation of neurons
+  "GO:0007399", # nervous system development
+  "GO:0001505", # regulation of neurotransmitter levels
+  
+  # Additional terms
+  "GO:0050890", # cognition
+  "GO:1901888", # regulation of cell junction assembly
+  "GO:0098742", # cell-cell adhesion via plasma-membrane adhesion molecules
+  "GO:0048813", # dendrite morphogenesis
+  "GO:0009306"  # protein secretion
+)
+df1 <- subset(go1@result, ID %in% go_interest) %>% mutate(GeneCount = lengths(strsplit(geneID, "/")), Source = "Dlx2")
+df2 <- subset(go2@result, ID %in% go_interest) %>% mutate(GeneCount = lengths(strsplit(geneID, "/")), Source = "Bcl2")
+combined <- rbind(df1, df2) %>% mutate(color = ifelse(Source == "Dlx2", "#00FA9A", "#6A5ACD"))
+
+ggplot(combined, aes(x = reorder(Description, GeneCount), y = GeneCount, fill = color)) +
+  geom_col(position = "dodge") + coord_flip() + theme_minimal() +
+  scale_fill_identity(guide = "legend", labels = c("Dlx2", "Bcl2"), breaks = c("#00FA9A", "#6A5ACD"), name = "Source") +
+  labs(x = NULL, y = "Gene Count", title = "GO Terms: Neuronal Structure & Synapses") +
+  theme(panel.grid = element_blank(), axis.text.y = element_text(size = 15))
+
+```
+
+```{r}
+go_interest <- c(
+  
+   "GO:0050803", # regulation of synapse structure or activity
+     "GO:0050807", # regulation of synapse organization
+     "GO:0007416", # synapse assembly
+     "GO:0099173", # postsynapse organization
+     "GO:0009306",  # protein secretion
+     "GO:0099003", # vesicle-mediated transport in synapse
+       "GO:0050773", # regulation of dendrite development
+   
+  "GO:0031175", # neuron projection development
+  "GO:0007409", # axonogenesis
+  "GO:0016358", # dendrite development
+  "GO:0048812", # neuron projection morphogenesis
+  "GO:0001764", # neurite morphogenesis
+  "GO:0050770", # regulation of axonogenesis
+       "GO:0007269" # neurotransmitter secretion
+
+ 
+)
+```
+
+
+## Figure 5a/b, same code for  Fig. S10b
+```{r}
+library(ggplot2)
+library(reshape2)
+ephy_up_Bcl2 <- c("Hcn1","Scn1a","Kcnc1","Kcnj3","Cacna1e")
+gene_to_protein_map_ephy_up_Bcl2 <- c("Hcn1"="HCN1","Scn1a"="Nav1.1","Kcnc1"="Kv3.1","Kcnj3"="GIRK1","Cacna1e"="Cav2.3")
+ephy_up_Dlx2 <- c("Cacna1a","Cacna1g","Cacna2d2","Kcnip1","Kcnj6")
+gene_to_protein_map_ephy_up_Dlx2 <- c("Cacna1a"="Cav2.1","Cacna1g"="Cav3.1","Cacna2d2"="α2δ2","Kcnip1"="KChIP1","Kcnj6"="Kir3.2")
+my_colors <- c("#9400D3","#6A5ACD","#32CD32","#00FA9A","#A88BB3","#C9B08A","#8BAAC0","#9BB199")
+sample_levels <- c("Ascl1SA6Bcl2_2wpi","Ascl1SA6Bcl2_4wpi","Ascl1SA6Dlx2_2wpi",
+                   "Ascl1SA6Dlx2_4wpi","Vip_P28","Sst_P28","Pvalb_P28","Lamp5_P28")
+make_plot_df <- function(genes, map, sample_levels){
+  genes <- intersect(genes, rownames(Neurons))
+  expr <- GetAssayData(Neurons, slot="data")[genes,,drop=F]
+  df <- reshape2::melt(as.matrix(expr))
+  df$sample <- factor(Neurons$sample[match(df$Var2, colnames(expr))], levels = sample_levels)
+  df$gene_protein <- factor(paste0(df$Var1," (",map[df$Var1],")"), levels = paste0(genes," (",map[genes],")"))
+  df <- subset(df, sample %in% sample_levels)
+  setNames(df, c("gene","cell","expression","sample","gene_protein"))
+}
+make_violin_plot <- function(df, title){
+  ggplot(df, aes(sample, expression, fill=sample)) +
+    geom_violin(scale="width", trim=TRUE) +
+    facet_wrap(~gene_protein, ncol=1, scales="free_y", strip.position="right") +
+    theme_minimal(base_size=13) +
+    theme(axis.text.x=element_text(angle=50,hjust=1),
+          panel.grid=element_blank(),
+          panel.border=element_rect(color="black",fill=NA),
+          strip.background=element_blank(),
+          strip.text.y=element_text(angle=0,hjust=0)) +
+    labs(x=NULL, y="Expression", title=title) +
+    scale_fill_manual(values=my_colors) +
+    guides(fill="none")
+}
+
+print(make_violin_plot(make_plot_df(ephy_up_Bcl2, gene_to_protein_map_ephy_up_Bcl2, sample_levels), ""))
+print(make_violin_plot(make_plot_df(ephy_up_Dlx2, gene_to_protein_map_ephy_up_Dlx2, sample_levels), ""))
+```
+
+## Figure 6a/g , same code for Figure S11d
+```{r}
+sample_levels <- c("Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_4wpi")
+my_colors <- c("Ascl1SA6Bcl2_4wpi"="#6A5ACD", "Ascl1SA6Dlx2_4wpi"="#00FA9A")
+glu_rc_genes_sel <- c("Gria1","Gria2","Gria3","Gria4","Grik2","Grik3","Grik4","Grik5","Grin1","Grin2a","Grin2b","Grin3a")
+gene_to_protein_map_glu_sel <- c( "Gria1"="GluA1","Gria2"="GluA2","Gria3"="GluA3","Gria4"="GluA4", "Grik2"="GluK2","Grik3"="GluK3","Grik4"="GluK4","Grik5"="GluK5", "Grin1"="GluN1","Grin2a"="GluN2A","Grin2b"="GluN2B","Grin3a"="GluN3A")
+
+make_plot_df <- function(genes, map, sample_levels){
+  genes <- intersect(genes, rownames(Neurons))
+  expr <- GetAssayData(Neurons, slot="data")[genes,,drop=F]
+  df <- reshape2::melt(as.matrix(expr))
+  df$sample <- factor(Neurons$sample[match(df$Var2, colnames(expr))], levels = sample_levels)
+  df$gene_protein <- factor(paste0(df$Var1," (",map[df$Var1],")"), levels = paste0(genes," (",map[genes],")"))
+  df <- subset(df, sample %in% sample_levels)
+  setNames(df, c("gene","cell","expression","sample","gene_protein"))
+}
+
+make_violin_plot <- function(df, title){
+  ggplot(df, aes(sample, expression, fill=sample)) +
+    geom_violin(scale="width", trim=TRUE) +
+    facet_wrap(~gene_protein, ncol=1, scales="free_y", strip.position="right") +
+    theme_minimal(base_size=13) +
+    theme(axis.text.x=element_text(angle=50,hjust=1),
+          panel.grid=element_blank(),
+          panel.border=element_rect(color="black",fill=NA),
+          strip.background=element_blank(),
+          strip.text.y=element_text(angle=0,hjust=0)) +
+    labs(x=NULL, y="Expression", title=title) +
+    scale_fill_manual(values=my_colors) +
+    guides(fill="none")
+}
+print(make_violin_plot(make_plot_df(glu_rc_genes_sel, gene_to_protein_map_glu_sel, sample_levels), "Glutamatergic Channels"))
+```
+
+
+

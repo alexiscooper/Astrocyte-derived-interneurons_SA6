@@ -1,0 +1,245 @@
+
+
+```{r}
+#| label: reportsetup
+#| include: false
+knitr::opts_chunk$set(echo = T, include = T,
+                      fig.width = 8, fig.height = 6,
+                      fig.align = 'center',
+                      warning = F, message = F,
+                      eval=T) 
+```
+
+
+The space below contain the codes used in this analysis for the purposes of
+transparency and reproducibility:
+
+<!-- Describe methodology -->
+
+## Load dependencies
+The code below loads all dependencies to run the script.
+```{r}
+#| label: load_dependencies
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+suppressPackageStartupMessages({
+    library(Seurat)
+library(SeuratData)
+library(SeuratDisk)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(gridExtra)
+library(tidyverse)
+library(RColorBrewer)
+library(dittoSeq)
+library(Nebulosa)
+library(dplyr)
+library(magrittr)
+library(patchwork)
+library(scCustomize)
+library(qs)
+library(viridis)
+})
+```
+
+# Loading of data 
+
+```{r}
+#| label: load_data
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+mergeAll <- readRDS("/2wpi_merged_logNorm.rds")
+```
+
+```{r}
+###order samples 
+mergeAll$RV <- factor(mergeAll$RV,levels=c("Control" ,"Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2", "Ascl1SA6Dlx2", "Ascl1WTSA6", "Ascl1WTDlx2", "Ascl1SA6Dlx2_2", "Ascl1SA6Bcl2_mat", "Ascl1SA6Dlx2_mat"))
+```
+
+```{r}
+#| label: harmony_umap
+#| eval: true
+#| include: true
+#| classes: styled-output
+# UMAP plot of harmony's integration
+mergeAll <- FindClusters(object = mergeAll, resolution = 1)
+mergeAll<- RunUMAP(object = mergeAll, dims = 1:16)
+DimPlot(mergeAll, reduction = "umap", group.by = "RV", shuffle = T) + scale_x_reverse() 
+DimPlot(mergeAll, reduction = "umap", group.by = 'seurat_clusters', label = TRUE, pt.size = 0.5) + Blank_Theme() 
+```
+Atp13a5 pericyte marker
+
+```{r}
+# Set identities to clusters if not already set
+Idents(mergeAll) <- "seurat_clusters"
+# Find markers for cluster 23 vs all other clusters
+markers_cluster23 <- FindMarkers(mergeAll, ident.1 = "23", min.pct = 0.25, logfc.threshold = 0.25)
+
+```
+
+
+```{r}
+FeaturePlot(mergeAll, c("Atp1a2"), max.cutoff = 1.5, reduction = "umap", split.by = ) & Blank_Theme()
+```
+
+
+```{r, fig.width=17, fig.height=3}
+VlnPlot(mergeAll,  features = c("nFeature_RNA", "nCount_RNA"), group.by = "RV", split.by = "RV",  pt.size = 0) +theme_minimal()
+```
+
+
+```{r}
+# Extract nCount_RNA and RV metadata columns
+nCount_RNA <- mergeAll@meta.data$nCount_RNA
+RV <- mergeAll@meta.data$RV
+# Compute mean nCount_RNA per RV group
+mean_nCount_per_RV <- tapply(nCount_RNA, RV, mean)
+print(mean_nCount_per_RV)
+```
+
+
+
+```{r Cluster names, warning = FALSE, message = FALSE}
+Ann_2and4wpi <- RenameIdents(mergeAll,
+`0` = "OPC_like", 
+`1` = "Pyr", 
+`2` = "iNs",
+`3` = "iNs",
+`4` = "Microglia/Macrophages", 
+`5` = "iNs", 
+`6` = "Pyr",
+`7` = "Pyr", 
+`8` = "Astrocytes", 
+`9` = "Pyr",
+`10` = "eInterneurons", 
+`11` = "Astrocytes",
+`12` = "Pericytes/P-deverived-iNs", 
+`13` = "Pyr", 
+`14` = "iNs",
+`15` = "Pyr", 
+`16` = "Pyr", 
+`17` = "Arrested_1", 
+`18` = "Oligodendrocytes", 
+`19` = "Arrested_2", 
+`20` = "iNs", 
+`21` = "eInterneurons", 
+`22` = "Oligodendrocytes", 
+`23` = "Pericytes/P-deverived-iNs", 
+`24` = "Pyr", 
+`25` = "OPC_like", 
+`26` = "Microglia/Macrophages",
+`27` = "iNs",
+`28` = "Unknown",
+`29` = "Microglia/Macrophages",
+`30` = "Microglia/Macrophages",
+`31` = "OPC_like",
+`32` = "Pyr",
+`33` = "Unknown",
+`34` = "iNs",
+`35` = "Unknown",
+`36` = "Pyr",
+`37` = "Pericytes/P-derived-iNs"
+)
+Ann_2and4wpi <- StashIdent(Ann_2and4wpi, save.name = 'cell.type')
+Ann_2and4wpi[["cell.type"]] <- Idents(object = Ann_2and4wpi)
+Ann_2and4wpi <- subset(Ann_2and4wpi, idents = "Unknown", invert = TRUE)
+
+DimPlot(Ann_2and4wpi, reduction = "umap", group.by = "RV", shuffle = T)+ scale_y_reverse() 
+DimPlot(Ann_2and4wpi, reduction = "umap", group.by = 'cell.type', pt.size = 0.5) + Blank_Theme() + scale_x_reverse() 
+DimPlot(Ann_2and4wpi, reduction = "umap", group.by = 'seurat_clusters', pt.size = 0.5) + Blank_Theme()
+```
+```{r}
+table(Ann_2and4wpi[["cell.type"]] <- Idents(Ann_2and4wpi))
+```
+
+
+```{r}
+Ann_2and4wpi$RV <- plyr::mapvalues(Ann_2and4wpi$RV,
+                                  from = c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2",  "Ascl1WTSA6", "Ascl1WTDlx2", "Ascl1SA6Dlx2_2", "Ascl1SA6Bcl2_mat", "Ascl1SA6Dlx2_mat"),
+                                  to = c("Control_2wpi", "Ascl1WT_2wpi", "Ascl1WTBcl2_2wpi", "Ascl1SA6_2wpi", "Ascl1SA6Bcl2_2wpi",  "Ascl1WTSA6_2wpi", "Ascl1WTDlx2_2wpi", "Ascl1SA6Dlx2_2wpi", "Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_4wpi"))
+```
+
+
+##for Extended dATA 
+```{r}
+cell_type_colors <- c(
+  "Oligodendrocytes"= "#708090",
+"OPC_like"= "#A7BDD3",
+"Astrocytes"= "#A9D3A9",
+"Arrested_1"= "#8F9D53", 
+"Arrested_2"= "#006400", 
+"iNs"= "#4A5336", 
+"eInterneurons"= "grey",
+"Pyr"= "lightgrey",
+"Microglia/Macrophages"= "#696969", 
+"Pericytes/P-derived-iNs"= "#FFE4E1") 
+
+Ann_2and4wpi@meta.data$cell.type.color <- cell_type_colors[Ann_2and4wpi@meta.data$cell.type]
+
+DimPlot(object = Ann_2and4wpi,  group.by = "cell.type",  cols = cell_type_colors,label = FALSE,  pt.size = 0.5) & NoLegend() & Blank_Theme()  & scale_x_reverse()
+DimPlot(object = Ann_2and4wpi,  group.by = "cell.type",  cols = cell_type_colors,label = FALSE,  pt.size = 0.5, split.by = "RV", ncol = 5) & NoLegend() & Blank_Theme()  & scale_x_reverse()
+
+Ann_2and4wpi_filtered <- subset(Ann_2and4wpi, RV != "Ascl1WTSA6_2wpi")
+
+# Make RV a factor with your desired order
+Ann_2and4wpi_filtered$RV <- factor( Ann_2and4wpi_filtered$RV, levels = c("Control_2wpi", "Ascl1WT_2wpi", "Ascl1WTBcl2_2wpi",   "Ascl1SA6_2wpi", "Ascl1SA6Bcl2_2wpi",  "Ascl1WTDlx2_2wpi", "Ascl1SA6Dlx2_2wpi",  "Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_4wpi"))
+
+dittoBarPlot(Ann_2and4wpi_filtered, "cell.type", group.by = "RV", x.reorder = c(9,6,7,8,1,2,3,4,5),   var.labels.reorder = c(3,1,2,5,4,10,8,7,6,9) ) + scale_fill_manual(values = cell_type_colors)
+
+```
+
+```{r}
+# Define mapping of samples to wpi
+wpi_2 <- c("Control_2wpi", "Ascl1WT_2wpi", "Ascl1WTBcl2_2wpi", "Ascl1SA6_2wpi", "Ascl1SA6Bcl2_2wpi", "Ascl1SA6Dlx2_2wpi", "Ascl1WTSA6_2wpi", "Ascl1WTDlx2_2wpi", "Ascl1SA6Dlx2_2wpi")
+wpi_4 <- c("Ascl1SA6Bcl2_4wpi", "Ascl1SA6Dlx2_4wpi")
+
+# Create new column based on 'RV' column
+Ann_2and4wpi$wpi <- ifelse(Ann_2and4wpi$RV %in% wpi_2, "2wpi",
+                           ifelse(Ann_2and4wpi$RV %in% wpi_4, "4wpi", NA))
+
+```
+
+```{r}
+saveRDS(Ann_2and4wpi, "/2wpi_merged_logNorm_annotated.rds")
+```
+
+```{r}
+Ann_2and4wpi <- readRDS("/2wpi_merged_logNorm_annotated.rds")
+```
+
+
+
+
+```{r}
+
+# Plotting expression of cell population markers 
+## Astro: 
+FeaturePlot(Ann_2and4wpi, c("Gfap", "Aldh1l1","Sox9", "Atp1b2", "Aqp4"), max.cutoff = 1.5,reduction = "umap")
+##OPCs: 
+FeaturePlot(Ann_2and4wpi, c("Sox10","Mki67", "Top2a", "Cspg4", "Olig1", "Olig2", "Pdgfra"), max.cutoff = 1.5,reduction = "umap")
+## Microglia:
+FeaturePlot(Ann_2and4wpi, c("P2ry12","Aif1", "Itgam", "Cd68", "Fcrls", "Gpr34", "Olfml3","Selplg", "Ctss", "Bcl2a1b", "C1qa", "Sall1"), max.cutoff = 1.5,reduction = "umap")
+##Pericytes: 
+FeaturePlot(Ann_2and4wpi, c("Pdgfra","Cspg4", "Pdgfrb", "Nes", "Pecam1","Rgs5"), max.cutoff = 1.5,reduction = "umap")
+##Cycling (G2M and S-phase, or use s.features, g2m.features): 
+FeaturePlot(Ann_2and4wpi, c("Top2a", "Mcm2", "Mki67", "Pcna", "Cdk1", "Ccnb1"), max.cutoff = 1.5,reduction = "umap")
+##Neuronal: 
+FeaturePlot(Ann_2and4wpi, c("Rbfox3", "Dcx","Srrm4", "Myt1l", "Map2"), max.cutoff = 1.5,reduction = "umap")
+##Intermediate: 
+FeaturePlot(Ann_2and4wpi, c("Sox11", "Dcx", "Sox2"), max.cutoff = 1.5,reduction = "umap")
+##Oligodendrocytes:
+FeaturePlot(Ann_2and4wpi, c("Mbp", "Sox10", "Mog","Mag","Cldn11"), max.cutoff = 1.5,reduction = "umap")
+```
+
+
+
+```{r}
+# Tools' versions used during this analysis
+sessionInfo()
+```
+

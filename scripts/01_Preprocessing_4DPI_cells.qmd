@@ -1,0 +1,971 @@
+---
+title: 'Dlx2 reprograms the transcriptome of astrocyte-derived interneurons and enforces canonical laminar positioning.'
+subtitle: '1: Preprocessing 4DPI Cells'
+
+---
+
+```{r}
+#| label: reportsetup
+#| include: false
+knitr::opts_chunk$set(echo = T, include = T,
+                      fig.width = 20, fig.height = 10,
+                      fig.align = 'center',
+                      warning = F, message = F,
+                      eval=T) 
+```
+
+The space below contain the codes used in this analysis for the purposes of
+transparency and reproducibility:
+
+<!-- Describe methodology -->
+
+## Load dependencies
+The code below loads all dependencies to run the script.
+```{r}
+#| label: load_dependencies
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+suppressPackageStartupMessages({
+    library(tidyverse)
+    library(Seurat)
+    library(SeuratWrappers)
+    library(flexmix)
+    library(ggplot2)
+    library(patchwork)
+   # library(DoubletFinder)
+    library(scDblFinder)
+    library(UpSetR)
+    library(clustree)
+    library(MatrixGenerics)
+    library(RColorBrewer)
+    library(scCustomize)
+  library(dittoSeq)
+})
+```
+
+## Import count matrices
+
+For every experiment, we will prepare a samples metadata file (CSV) that should 
+contain at least the following columns:
+
+PATH : Path to gene expression matrix of each experiment
+
+ID : Experiment name or ID that will be passed to orig.ident
+
+The metadata file can contain any other information pertaining to the experiment 
+which will be passed into the metadata dataframe of the Seurat object.
+
+```{r}
+#| label: load_metadata
+#| eval: true
+#| include: true
+#| classes: styled-output
+## Import samples meta file.
+samples.meta <- read_csv("/samples.csv")
+
+samples.meta
+```
+
+We start by importing the metadata file and create a list of Seurat objects for 
+each experiment:
+
+```{r}
+#| label: load_count_matrices
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+## Check if all paths are present.
+all(dir.exists(samples.meta$Path))
+
+## In this case I will filter for all 4dpi samples only.
+samples.meta.4dpi <- samples.meta %>% 
+  filter(timepoint == "4dpi")
+
+## Creating seurat list with all samples.
+seuratlist.4dpi <- apply(samples.meta.4dpi, 1, function(line){
+
+    # Load directory containing the matrix.mtx, features.tsv, and barcodes.tsv files provided by 10X.
+    sample <- Read10X(data.dir = line[["Path"]])
+  
+    # Create seurat objects
+    sample.seurat <- CreateSeuratObject(counts = sample,
+                                        project = line[["RV"]],
+                                        min.cells = 4, min.features = 200)
+    sample.seurat$experiment <- "RNA"
+    
+    # Adding additional metadata 
+    #sample.seurat@meta.data <- mutate(sample.seurat@meta.data, !!!line)
+
+    sample.seurat
+})
+
+names(seuratlist.4dpi) <- samples.meta.4dpi$RV
+```
+
+## Quantify QC metrics
+
+Next, add more information on the quality of each cell by quantifying the 
+following metrics:
+
+- Percent mitochondria
+- Label low quality cells (MiQC)
+- Percent ribosomal
+- Doublet annotation
+- Cell cycle phase
+
+These values will be stored in the meta.data slot of each Seurat object.
+
+### Percent mitochondria
+```{r}
+#| label: percent_mito
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+### Identify percentage of mitochondrial genes
+seuratlist.4dpi <- lapply(seuratlist.4dpi, function(sample){
+    sample$percent.mt <- PercentageFeatureSet(sample, pattern = "^mt-") 
+    Idents(sample) <- "experiment"
+    sample
+})
+
+# Run miQC-wrapper to model both the proportion of reads mapping to mtDNA genes 
+# and the number of detected genes with mixture models in a probabilistic 
+# framework to identify the low-quality cells
+
+seuratlist.4dpi <- lapply(seuratlist.4dpi, function(sample){
+    sample <- RunMiQC(sample, percent.mt = "percent.mt", 
+                      nFeature_RNA = "nFeature_RNA", posterior.cutoff = 0.75,
+                      model.slot = "flexmix_model")
+    sample
+})
+```
+
+### Label low quality cells (MiQC)
+```{r}
+#| label: MiQC_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Plots for MiQC
+do.call(wrap_plots,lapply(seuratlist.4dpi, function(sample){
+    PlotMiQC(sample, color.by = "miQC.probability") + 
+      scale_color_gradient(low = "grey", high = "purple") + 
+      labs(title= sample$orig.ident[1],
+           subtitle=paste("Max:", round(max(sample$percent.mt[sample$miQC.probability < 0.75]), digits = 3))) +
+        theme(plot.title = element_text(size = 20),
+              plot.subtitle = element_text(size = 15),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size=15),
+              legend.text = element_text(size=15))
+}))
+```
+
+### Percent ribosomal
+```{r}
+#| label: percent_ribo
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+## calculate percent ribosomal
+seuratlist.4dpi <- lapply(seuratlist.4dpi, function(sample){
+    sample$percent.rb <- PercentageFeatureSet(sample, pattern = "^Rp[sl]") 
+    Idents(sample) <- "experiment"
+    sample
+})
+```
+
+#### Plot correlation between mitochondrial and ribosomal genes
+```{r}
+#| label: scatter_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+### Plot mitochondrial genes VS ribosomal genes to see correlation
+do.call(wrap_plots,lapply(seuratlist.4dpi, function(sample){
+    FeatureScatter(sample, feature1 = "percent.rb", feature2 = "percent.mt") +
+        labs(title = sample$orig.ident[1]) +
+        theme(plot.title = element_text(size = 20),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.height = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size = 15),
+              legend.text = element_text(size = 15))
+}))
+```
+
+```{r}
+#| label: vln_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+#| height: 8
+
+### Plot mitochondrial genes, ribosomal genes, and number of RNA counts per dataset 
+lapply(seuratlist.4dpi, function(sample){
+  plots <- lapply(c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"), function(feature){
+    VlnPlot(sample, features = feature, pt.size = 0.01) +
+        theme(plot.title = element_text(size = 15,face = "plain"),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.height = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size = 15),
+              legend.text = element_text(size = 15),
+              legend.position="none") 
+  })
+  wrap_plots(plots, ncol = 4)  + 
+  plot_annotation(title=sample$orig.ident[1], 
+                  theme=theme(plot.title=element_text(hjust=0.5,face = "bold", size = 25)))
+}) 
+
+```
+::: {.callout-warning}
+## To discuss
+
+- Further dimensionality reduction (e.g., t-SNE) and unsupervised clustering were 
+also utilized in Doubletfinder's paper as pre-processing. Plus, seurat object was
+pre-filtered. Removing poor quality cells.
+- Homotypic doublet proportion estimation using annotation and adjusting nExp 
+value using this. 
+:::
+
+```{r}
+#| label: doublefinder
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Increasing maximum size allowed for Global size  
+options(future.globals.maxSize = 8000 * 1024^2)
+
+## Run LogNorm, FindVariableFeatures and Scale
+seuratlist.4dpi <- lapply(seuratlist.4dpi, function(sample){
+  sample <- NormalizeData(sample, normalization.method = "LogNormalize", scale.factor = 10000)
+  sample <- FindVariableFeatures(sample, selection.method = "vst", nfeatures = 2000)
+  sample <- ScaleData(sample, features = rownames(sample))
+})
+
+## Run PCA
+seuratlist.4dpi <- lapply(seuratlist.4dpi, function(sample){
+    sample <- RunPCA(sample)
+    sample
+})
+```
+
+::: {.callout-note}
+## Recommendation
+
+We recommend using `scDblFinder` for Doublet annotation, as it has been reported
+it outperforms other tools. Additionally, when plotting parameters like nCount_RNA 
+and nFeature_RNA we can observe the expected behaviour in the annotated doublets.
+
+Be aware that there is poor overlap between the outputs of `doubletFinder` and 
+`scDblFinder`.
+:::
+
+```{r}
+#| label: scDblfinder
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+## annotate doublets using scDblFinder
+set.seed(123)
+
+seuratlist.4dpi <- lapply(seuratlist.4dpi, function(sample){
+    sce <- scDblFinder(GetAssayData(sample, assay = "RNA", layer = "counts"))
+    sample$scDblFinder.class <- sce$scDblFinder.class
+    sample@meta.data <- sample@meta.data %>% 
+      mutate(scDblFinder.class = ifelse(sample@meta.data$scDblFinder.class == "doublet", "Doublet", "Singlet"))
+    sample
+})
+```
+
+
+```{r}
+#| label: scDblfinder_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+lapply(seuratlist.4dpi, function(sample){
+  plots <- lapply(c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"), function(feature){
+    VlnPlot(sample, features = feature, pt.size = 0.01, group.by = "scDblFinder.class") +
+        theme(plot.title = element_text(size = 15,face = "plain"),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.height = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size = 15),
+              legend.text = element_text(size = 15),
+              legend.position="none") 
+  })
+  wrap_plots(plots, ncol = 4) + 
+    plot_annotation(title=sample$orig.ident[1], 
+                    theme=theme(plot.title=element_text(hjust=0.5,face = "bold", size = 25)))
+}) 
+```
+
+
+::: {.callout-note}
+## Recommendation
+
+We recommend annotating for cell cycle phase. This is a good idea if you see 
+that cell cycle drives some unwanted cluster separation purely based on these genes
+:::
+
+```{r}
+#| label: cycle_genes
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+## quantify cell cycle phase
+### run cell cycle scoring
+cc.genes <- cc.genes.updated.2019
+
+##################
+# To convert cc.genes to other organism of choice, run the following:
+cc.genes <- lapply(cc.genes, function(genes) {
+   gprofiler2::gorth(genes, 
+        target_organism = "mmusculus"  
+   )$ortholog_name
+})
+##################
+
+seuratlist.4dpi <- lapply(seuratlist.4dpi, function(sample){
+	sample <- CellCycleScoring(sample,
+	                           s.features = cc.genes$s.genes,
+	                           g2m.features = cc.genes$g2m.genes, 
+	                           set.ident = FALSE)
+})
+```
+
+## Cell cycle scoring
+```{r}
+#| label: cycle_genes_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+do.call(wrap_plots,lapply(seuratlist.4dpi, function(sample){
+    sample@meta.data %>% 
+        ggplot(aes(x=Phase, fill = Phase)) + 
+        geom_bar() +
+        theme_minimal() +
+        scale_fill_brewer(palette = "Set2") +
+        labs(title = sample$orig.ident[1]) +
+        theme(plot.title = element_text(size = 20),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              axis.text = element_text(size = 15),
+              legend.key.size = unit(0.5, 'cm'), 
+              legend.key.height = unit(0.5, 'cm'), 
+              legend.key.width = unit(0.5, 'cm'), 
+              legend.title = element_text(size=15),
+              legend.text = element_text(size=15)) 
+}))
+```
+
+::: {.callout-tip}
+## Best practice
+
+Another best practice recommendation is the correction of ambient RNA.
+This can be done using `SoupX` or `CellBender`, the later is python-based.
+`CellBender` is reported to perform best overall, however, we have not used it
+before. 
+:::
+
+```{r}
+#| label: save_obj
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Save raw data, before filtering
+saveRDS(seuratlist.4dpi, "../outputs/RDS/seuratlist_4dpi_raw.rds")
+```
+
+## Filtering poor quality cells
+We recommend automatic thresholding via MAD (median absolute deviations).
+We mark cells as outliers if they differ by 3 MADs. For a relatively more 
+permissive filtering strategy 5 MADs can be applied.
+:::
+
+```{r}
+#| label: filt_obj_MAD
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+seuratlist.4dpi <- readRDS("/seuratlist_4dpi_raw_LogNorm.rds")
+
+## Thresholding using median absolute deviation from the median
+qc.df <- do.call(rbind,lapply(seuratlist.4dpi, function(sample){
+    feature.cutoff.min <- median(sample@meta.data$nFeature_RNA) - 5*mad(sample@meta.data$nFeature_RNA)
+    feature.cutoff.min <- ifelse(feature.cutoff.min < 200, 200, feature.cutoff.min)
+    feature.cutoff.max <- median(sample@meta.data$nFeature_RNA) + 5*mad(sample@meta.data$nFeature_RNA)
+    return(data.frame(feature.cutoff.min = feature.cutoff.min,
+                      feature.cutoff.max = feature.cutoff.max))
+}))
+
+seuratlist.4dpi.filt <- lapply(seuratlist.4dpi, function(sample) {
+    sample.id <- sample$orig.ident[1]
+    subset(sample, 
+           subset = nFeature_RNA > qc.df[sample.id,]$feature.cutoff.min & 
+                    nFeature_RNA < qc.df[sample.id,]$feature.cutoff.max & 
+                    miQC.keep == "keep" & 
+                    scDblFinder.class == "Singlet")
+})
+```
+
+## Dimensional reduction of filtered data
+
+Performing Normalization and dimensional reduction via pca for each sample
+```{r}
+#| label: dim_red
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Increasing maximum size allowed for Global size  
+options(future.globals.maxSize = 8000 * 1024^2)
+
+## Run LogNorm, FindVariableFeatures and Scale on filtered samples
+seuratlist.4dpi.filt <- lapply(seuratlist.4dpi.filt, function(sample){
+  sample <- FindVariableFeatures(sample, selection.method = "vst", nfeatures = 2000)
+  sample <- ScaleData(sample, features = rownames(sample))
+})
+
+## Perform dimensional reduction
+seuratlist.4dpi.filt <- lapply(seuratlist.4dpi.filt, function(sample){
+	sample <- RunPCA(sample)
+  sample 
+})
+
+saveRDS(seuratlist.4dpi.filt, "/seuratlist_4dpi_filt_LogNorm.rds")
+```
+
+## Annotation of reporter genes
+
+We observe the expression of reporter genes per sample
+```{r}
+#| label: reporter_genes_exp
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Plot expression of reporter genes
+genes_of_interest <- c("Mscarlet3LTR", "GFPU3", "Mscarlet", "EGFPtetO", "NeonGreen")
+
+lapply(seuratlist.4dpi.filt, function(sample){
+  FeaturePlot(sample, features = genes_of_interest, reduction = "pca")
+})
+```
+
+We proceed to annotate cells per sample according to the expression of 
+reporter genes.
+```{r}
+#| label: reporter_genes_anno
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Annotate each sample based on expression of reporter genes
+seuratlist.4dpi.filt <- lapply(seuratlist.4dpi.filt, function(sample) {
+  for (gene in genes_of_interest) {
+    if (gene %in% rownames(sample)) {
+      sample@meta.data[[paste0(gene, ".pos")]] <- ifelse(
+        FetchData(object = sample, vars = c(gene), layer = "counts") > 0, "Pos", "Neg"
+      )
+    } 
+  }
+  return(sample)
+})
+
+#Saving sample names
+names.seuratlist.4dpi.filt <- names(seuratlist.4dpi.filt)
+
+# Annotate filtering based on expression of reporter genes
+seuratlist.4dpi.filt <- lapply(names(seuratlist.4dpi.filt), function(sample_name) {
+  seurat_object <- seuratlist.4dpi.filt[[sample_name]]
+  
+  # Add the new column based on conditions using if-else
+  if (sample_name == "Control") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos"
+  } else if (sample_name == "Ascl1WT") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos" & seurat_object@meta.data$GFPU3.pos == "Neg"
+  } else if (sample_name == "Ascl1WTBcl2") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos" & seurat_object@meta.data$GFPU3.pos == "Pos"
+  } else if (sample_name == "Ascl1SA6") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos" & seurat_object@meta.data$GFPU3.pos == "Neg"
+  } else if (sample_name == "Ascl1SA6Bcl2") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet3LTR.pos == "Pos" & seurat_object@meta.data$GFPU3.pos == "Pos"
+  } else if (sample_name == "Ascl1SA62") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet.pos == "Pos" & seurat_object@meta.data$EGFPtetO.pos == "Neg"
+  } else if (sample_name == "Ascl1SA6Dlx2") {
+    seurat_object@meta.data$transcript.filtering.keep <-  seurat_object@meta.data$EGFPtetO.pos == "Pos"
+  } else if (sample_name == "Ascl1WTSA6") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet.pos == "Pos" & seurat_object@meta.data$NeonGreen.pos == "Pos"
+  } else if (sample_name == "Ascl1WTDlx2") {
+    seurat_object@meta.data$transcript.filtering.keep <-  seurat_object@meta.data$NeonGreen.pos == "Pos"
+  } else if (sample_name == "Dlx2") {
+    seurat_object@meta.data$transcript.filtering.keep <- seurat_object@meta.data$Mscarlet.pos == "Neg" & seurat_object@meta.data$NeonGreen.pos == "Pos"
+  } else if (sample_name == "Ascl1SA6Dlx2Bcl2") {
+    seurat_object@meta.data$transcript.filtering.keep <-  seurat_object@meta.data$Mscarlet3LTR.pos == "Pos"
+  }else if (sample_name == "Ascl1SA6Dlx2_2") {
+    seurat_object@meta.data$transcript.filtering.keep <-  seurat_object@meta.data$GFPU3.pos == "Neg" & seurat_object@meta.data$Mscarlet3LTR.pos == "Pos"
+  }
+  return(seurat_object)
+})
+
+# Renaming list 
+names(seuratlist.4dpi.filt) <- names.seuratlist.4dpi.filt
+```
+
+This table reports the number of cells annotated according to the expression
+of reporter genes/combination of genes.
+```{r}
+#| label: reporter_genes_tally
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+## Number of cells per sample after filtering and annotated based on reporter genes
+cell.tally <- do.call(rbind,lapply(seuratlist.4dpi.filt, function(sample){
+  tibble(samples = unique(sample$orig.ident),
+         total = nrow(sample@meta.data),
+         transcript.keep = nrow(filter(sample@meta.data, transcript.filtering.keep == TRUE)))
+}))
+
+cell.tally
+```
+
+The following plots show sparse to no expression of expected reporter genes in 
+cells for certain samples.
+
+```{r}
+#| label: reporter_genes_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+#| fig-width: 20
+#| fig.height: 10
+
+# Plotting annotation
+do.call(wrap_plots,lapply(seuratlist.4dpi.filt, function(sample){
+  DimPlot(sample, group.by = "transcript.filtering.keep", reduction = "pca")  +
+        labs(title = sample$orig.ident[1])
+}))
+```
+
+In the interest of retaining cells affected by this, we implemented a method
+that considers the clustering of cells and how far away each cell is from the 
+centroid (Mahalanobis distance) to determine outliers. Additionally, 
+those cells that express the expected combination of reporter genes (true cells)
+are retained as well.
+
+```{r}
+#| label: Clustering
+#| eval: false
+#| include: true
+#| classes: styled-output
+ 
+# Clustering of at low resolution for further filtering
+seuratlist.4dpi.filt <- lapply(seuratlist.4dpi.filt, function(sample){
+	sample <- FindNeighbors(sample, dims = 1:50)
+  sample <- FindClusters(sample, resolution = 0.1)
+  sample
+})
+```
+
+```{r}
+#| label: Clustering_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+#| fig-width: 20
+#| fig.height: 10
+
+# Plotting clusters
+do.call(wrap_plots,lapply(seuratlist.4dpi.filt, function(sample){
+  DimPlot(sample, reduction = "pca") +
+        labs(title = sample$orig.ident[1])
+}))
+```
+
+```{r}
+#| label: Clustering_tally
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+## Number of cells per cluster per sample after filtering and annotated based on reporter genes
+cluster.tally <- do.call(rbind,lapply(seuratlist.4dpi.filt, function(sample){
+  sample@meta.data %>% 
+    group_by(seurat_clusters,transcript.filtering.keep) %>% 
+    tally() %>% 
+    mutate(samples = unique(sample$orig.ident)) %>% 
+    relocate(samples, .before = seurat_clusters)
+}))
+
+cluster.tally
+```
+
+```{r}
+#| label: outlier_anno
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+## Annotating outliers for each cluster
+seuratlist.4dpi.filt <- lapply(seuratlist.4dpi.filt, function(sample){
+  
+  # Number of principal components to use
+  PC <- 10
+  
+  #Extract PCA embeddings
+  pca_df <- as.data.frame(Embeddings(sample, reduction = "pca"))[,1:PC]
+  
+  # Add cluster annotations
+  pca_df$cluster <- sample$seurat_clusters
+  pca_df$keep.anno <- sample$transcript.filtering.keep
+  
+  # Calculate Mahalanobis distance per cluster using lapply
+  results <- do.call(rbind, lapply(unique(pca_df$cluster), function(cl) {
+    
+    # Subset data for the cluster
+    cluster_data <- pca_df %>% filter(cluster == cl)
+    
+    # Calculate mean and covariance using only TRUE cells  
+    dat.center <- colMeans(cluster_data[, 1:PC]) ### This is not using only TRUE cells
+    #dat.center <- colMeans(cluster_data[cluster_data$keep.anno, 1:PC]) ### This would
+    dat.cov <- cov(cluster_data[, 1:PC])
+    #dat.cov <- cov(cluster_data[cluster_data$keep.anno, 1:PC]) ### Same here
+    
+    # Compute Mahalanobis distance
+    cluster_data$mdist <- mahalanobis(
+      x = cluster_data[, 1:PC],
+      center = dat.center,
+      cov = dat.cov
+    )
+    
+    # Calculate cut-off with Chi-squared (90% confidence)
+    cutoff <- qchisq(p = 0.90, df = PC)  
+    
+    # Add outliers based on Mahalanobis distance
+    cluster_data <- cluster_data %>%
+      mutate(Outlier = ifelse(mdist > cutoff, "Yes", "No"))
+    
+    # Return cluster results as a list
+    return(cluster_data)
+  }))
+  
+  # Keep all true cells based on reporter genes
+  results <- results %>% 
+    mutate(Outlier = ifelse(Outlier == "Yes" & keep.anno == TRUE, "No", Outlier)) %>% 
+    rownames_to_column("cell") %>% 
+    select(c("cell","Outlier", "mdist"))
+
+  # Append annotation to meta data
+  sample@meta.data <- sample@meta.data %>% 
+     rownames_to_column("cell") %>% 
+     left_join(results, by = join_by("cell")) %>% 
+      column_to_rownames("cell")
+   
+  return(sample)
+})
+```
+
+The following plots show the cells annotated as outliers and the percent of cell 
+that would be retained after filtering out said outliers.
+```{r}
+#| label: Outlier_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Plot distribution of outliers
+lapply(seuratlist.4dpi.filt, function(sample){
+  
+  # Calculate number of outliers per sample
+  outlier_table <- table(sample$Outlier)
+
+  # Calculate the percentage of retained cells 
+  percentage <- (outlier_table["No"] / sum(outlier_table)) * 100
+  
+  # Plot outlier cells per cluster in PCA
+  DimPlot(sample, reduction = "pca", group.by = "seurat_clusters", split.by = "Outlier", shuffle = T) +
+    labs(title = unique(sample$orig.ident),
+         subtitle = paste("% retained -", round(percentage,digits = 2)),
+         x = "PC1", y = "PC2")
+})
+```
+
+These are the final number of cells retained
+```{r}
+#| label: Outlier_tally
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+## Number of cells per sample after filtering for outliers
+Non_outlier.tally <- do.call(rbind,lapply(seuratlist.4dpi.filt, function(sample){
+  sample@meta.data %>% 
+    group_by(Outlier) %>% 
+    tally() %>% 
+    mutate(samples = unique(sample$orig.ident)) %>% 
+    filter(Outlier == "No") %>% 
+    relocate(samples, .before = Outlier)
+}))
+
+Non_outlier.tally
+```
+
+```{r}
+#| label: Outlier_filter
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+## Filtering data to remove outliers
+seuratlist.4dpi.filtered <- lapply(seuratlist.4dpi.filt, function(sample) {
+    sample.id <- sample$orig.ident[1]
+    subset(sample, 
+           subset = Outlier == "No")
+})
+```
+
+## Dimensional reduction of filtered data
+
+Performing Normalization and dimensional reduction via pca for each sample
+```{r}
+#| label: dim_red_pca
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Increasing maximum size allowed for Global size  
+options(future.globals.maxSize = 8000 * 1024^2)
+
+## Run LogNorm, FindVariableFeatures and Scale on filtered samples
+seuratlist.4dpi.filtered <- lapply(seuratlist.4dpi.filtered, function(sample){
+  sample <- FindVariableFeatures(sample, selection.method = "vst", nfeatures = 2000)
+  sample <- ScaleData(sample, features = rownames(sample))
+})
+
+## Perform dimensional reduction
+seuratlist.4dpi.filtered <- lapply(seuratlist.4dpi.filtered, function(sample){
+	sample <- RunPCA(sample)
+  sample 
+})
+```
+
+```{r}
+#| label: saveRDS
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+# Save filtered object
+saveRDS(seuratlist.4dpi.filtered, "/ss_list_filt_reporter_genes_LogNorm.rds")
+```
+
+```{r}
+#| label: pca_plot
+#| eval: true
+#| include: true
+#| classes: styled-output
+#| fig-width: 20
+#| fig.height: 10
+
+do.call(wrap_plots,lapply(seuratlist.4dpi.filtered, function(sample){
+  DimPlot(sample, reduction = "pca") +
+        labs(title = sample$orig.ident[1])
+}))
+```
+
+We obtain the overlap of variable features per sample. In this case, 40.6% of 
+3000 variable features are shared between all samples.
+
+```{r}
+#| label: varfeat_overlap
+#| eval: true
+#| include: true
+#| classes: styled-output
+
+# Computing the overlap of variable features between samples
+var.feat <- lapply(seuratlist.4dpi.filtered, VariableFeatures)
+
+upset(fromList(var.feat), sets = names(var.feat),
+      sets.bar.color = "#56B4E9", order.by = "freq",main.bar.color = "#660099")
+```
+
+```{r}
+seuratlist.4dpi.filtered <- readRDS("/ss_list_filt_reporter_genes_LogNorm.rds")
+```
+
+
+# Integration of samples
+```{r}
+#| label: harmony_integration
+#| eval: false
+#| include: true
+#| classes: styled-output
+
+
+## Merge Samples
+merged.seurat <- merge(x = seuratlist.4dpi.filtered[[1]],
+                       y = seuratlist.4dpi.filtered[2:length(seuratlist.4dpi.filtered)],
+                       merge.data = TRUE, add.cell.ids = c("Control", "Ascl1WT", "Ascl1WTBcl2", "Ascl1SA6", "Ascl1SA6Bcl2","Ascl1SA62", "Ascl1SA6Dlx2", "Ascl1WTSA6", 
+                                                           "Ascl1WTDlx2", "Dlx2","Ascl1SA6Dlx2_2", "Ascl1SA6Dlx2Bcl2"))
+
+merged.seurat <- merged.seurat %>% 
+  ScaleData(features = rownames(merged.seurat)) %>%
+  RunPCA()
+
+
+saveRDS(merged.seurat, "/seurat_4dpi_merged_LogNorm.rds")
+```
+
+
+
+```{r}
+mergeAll_filtered <- readRDS('/seurat_4dpi_merged_LogNorm.rds')
+```
+
+```{r}
+# Update RV values
+mergeAll_filtered$RV <- ifelse(mergeAll_filtered$RV == "Ascl1SA6Dlx2_2", "SA6Dlx2", mergeAll_filtered$RV)
+unique(mergeAll_filtered$RV)
+
+# Update Cell IDs
+
+mergeAll_filtered@meta.data <- mergeAll_filtered@meta.data %>%
+  rownames_to_column(var = "old.names") %>%
+  mutate(new.names = gsub("^Ascl1SA6Dlx2_2_", "SA6Dlx2_", old.names)) %>%
+  column_to_rownames(var = "old.names")
+
+mergeAll_filtered <- RenameCells(mergeAll_filtered, new.names = mergeAll_filtered$new.names)        
+         
+grep("^SA6Dlx2", rownames(mergeAll_filtered@meta.data), value = TRUE)
+grep("Ascl1SA6Dlx2_2", rownames(mergeAll_filtered@meta.data), value = TRUE)
+
+# Sample Name Mapping
+sample_name_mapping <- c(
+  "Control" = "A4",
+  "Ascl1WT" = "A5",
+  "Ascl1WTBcl2" = "A6",
+  "Ascl1SA6" = "A7",
+  "Ascl1SA6Bcl2" = "A8",
+  "Ascl1SA62" = "A9",
+  "Ascl1SA6Dlx2" = "A10",
+  "Ascl1WTSA6" = "A11",
+  "Ascl1WTDlx2" = "A12",
+  "Dlx2" = "A13",
+  "SA6Dlx2" = "A17",
+  "Ascl1SA6Dlx2Bcl2" = "A18"
+)
+
+# Copy the 'RV' column to 'sample_name' and replace values based on the mapping
+mergeAll_filtered$sample_name <- recode(mergeAll_filtered$RV, !!!sample_name_mapping)
+
+# Rename cells
+mergeAll_filtered$sample <- rownames(mergeAll_filtered@meta.data)
+mergeAll_filtered@meta.data <- separate(mergeAll_filtered@meta.data, col = 'sample', into = c('Sample','Barcode'), sep = '_')
+
+# Generate the 'cell_name_loom' column
+mergeAll_filtered@meta.data <- mergeAll_filtered@meta.data %>%
+  mutate(cell_name_loom = glue("{sample_name}_cellranger_output:{Barcode}")) %>%
+  mutate(cell_name_loom = str_replace_all(cell_name_loom, "-\\d+", "x")) %>%
+  mutate(cell_name_loom = glue("{cell_name_loom}-{sample_name}"))
+
+mergeAll_filtered <- RenameCells(mergeAll_filtered, new.names = mergeAll_filtered@meta.data$cell_name_loom)
+
+```
+
+```{r}
+mergeAll_filtered <- readRDS("/seurat_4dpi_merged_LogNorm_newID.rds") 
+```
+
+
+
+###continue with new Cell IDS 
+
+```{r}
+mergeAll_filtered <- readRDS("/seurat_4dpi_merged_LogNorm_newID.rds")             
+Idents(mergeAll_filtered) <- "RV"
+mergeAll_filtered <- subset(mergeAll_filtered, downsample=3000)
+print(table(mergeAll_filtered$RV))
+saveRDS(mergeAll_filtered, '/seurat_4dpi_merged_LogNorm_newID_3000.rds')
+```
+
+
+
+```{r install.data, eval=FALSE, include=FALSE}
+mergeAll_filtered <- readRDS("/seurat_4dpi_merged_LogNorm_newID_3000.rds")
+```
+
+```{r preprocessing7, error=TRUE, message=FALSE, include=FALSE}
+mergeAll_filtered <- FindNeighbors(object = mergeAll_filtered, dims = 1:35) 
+mergeAll_filtered <- FindClusters(object = mergeAll_filtered, resolution = 0.1)
+mergeAll_filtered <- RunUMAP(object = mergeAll_filtered, dims = 1:40)
+```
+
+```{r plotting all clusters, error=TRUE}
+Idents(mergeAll_filtered) <- "seurat_clusters"
+DimPlot(mergeAll_filtered, reduction = "umap", group.by = 'RV', pt.size = 0.5) + Blank_Theme()
+DimPlot(mergeAll_filtered, reduction = "umap", group.by = 'orig.ident', pt.size = 0.5) + Blank_Theme()
+DimPlot(mergeAll_filtered, reduction = "umap", group.by = 'seurat_clusters', pt.size = 0.5) + Blank_Theme()
+DimPlot(mergeAll_filtered, reduction = "umap", label = TRUE, pt.size = 0.5) 
+```
+
+```{r}
+# Violin plot of number of genes and library count for each sample
+VlnPlot(mergeAll_filtered, features = c("nFeature_RNA", "nCount_RNA"), group.by = "seurat_clusters", pt.size = 0)
+```
+## remove low transcript count cells 
+```{r}
+mergeAll_filtered <- subset(mergeAll_filtered, subset = seurat_clusters %in% c(4, 9, 10), invert = TRUE)
+DimPlot(mergeAll_filtered, group.by = "seurat_clusters", shuffle = TRUE)
+```
+
+```{r install.data, eval=FALSE, include=FALSE}
+saveRDS(mergeAll_filtered, '/seurat_4dpi_merged_LogNorm_newID_3000_removedlowcounts.rds')
+```
+
+
+```{r install.data, eval=FALSE, include=FALSE}
+mergeAll_filtered <- readRDS("/seurat_4dpi_merged_LogNorm_newID_3000_removedlowcounts.rds")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
